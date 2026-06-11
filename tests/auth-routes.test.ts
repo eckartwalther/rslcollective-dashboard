@@ -77,6 +77,13 @@ describe("AuthKit authorization routes", () => {
     expect(result.valid && result.payload.iat).toEqual(expect.any(Number));
   });
 
+  it("rejects malformed state", async () => {
+    await expect(validateSignedAuthState("malformed", env.SESSION_SECRET)).resolves.toEqual({
+      valid: false,
+      reason: "malformed"
+    });
+  });
+
   it("rejects tampered state", async () => {
     const state = await createSignedAuthState({
       flow: "register",

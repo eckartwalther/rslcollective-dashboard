@@ -1,19 +1,5 @@
 import "@testing-library/jest-dom/vitest";
 
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: (query: string): MediaQueryList => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false
-  })
-});
-
 class ResizeObserverMock {
   observe() {
     return undefined;
@@ -28,10 +14,26 @@ class ResizeObserverMock {
   }
 }
 
-Object.defineProperty(window, "ResizeObserver", {
-  writable: true,
-  value: ResizeObserverMock
-});
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false
+    })
+  });
+
+  Object.defineProperty(window, "ResizeObserver", {
+    writable: true,
+    value: ResizeObserverMock
+  });
+}
 
 Object.defineProperty(globalThis, "ResizeObserver", {
   writable: true,

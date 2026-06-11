@@ -81,7 +81,8 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
   let company = options.company ?? null;
   const calls = {
     created: 0,
-    updated: 0
+    updated: 0,
+    createdWithUserId: null as string | null
   };
 
   const sessionStore: SessionStore = {
@@ -95,8 +96,9 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
     createSessionStore: () => sessionStore,
     getUserById: async () => user,
     getCompanyForUser: async () => (user.company_id ? company : null),
-    createCompanyAndAttachUser: async (_db, _userId, data) => {
+    createCompanyAndAttachUser: async (_db, userId, data) => {
       calls.created += 1;
+      calls.createdWithUserId = userId;
       company = companyRowFromData(data, { id: "cmp_created" });
       user = { ...user, company_id: company.id };
       return company;
@@ -253,6 +255,24 @@ describe("company API", () => {
     expect(invalid.status).toBe(403);
   });
 
+  it("accepts matching production Origin for authenticated PUT", async () => {
+    const { route } = createHarness();
+    const response = await route.request(
+      "/",
+      {
+        method: "PUT",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+          Origin: "https://dashboard.rslcollective.org"
+        }),
+        body: JSON.stringify(validPayload)
+      },
+      productionEnv
+    );
+
+    expect(response.status).toBe(201);
+  });
+
   it("creates the first company and attaches the user", async () => {
     const { route, calls } = createHarness();
     const response = await route.request(
@@ -271,6 +291,7 @@ describe("company API", () => {
 
     expect(response.status).toBe(201);
     expect(calls.created).toBe(1);
+    expect(calls.createdWithUserId).toBe("usr_test");
     expect(calls.updated).toBe(0);
     expect(body.company).toMatchObject({
       legalName: "Example Media Inc.",

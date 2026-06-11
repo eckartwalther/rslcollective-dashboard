@@ -78,6 +78,15 @@ describe("companyProfileSchema", () => {
     ).toThrow();
   });
 
+  it("rejects companyId", () => {
+    expect(() =>
+      companyProfileSchema.parse({
+        ...validPayload,
+        companyId: "cmp_test"
+      })
+    ).toThrow();
+  });
+
   it("rejects role", () => {
     expect(() =>
       companyProfileSchema.parse({
@@ -101,6 +110,15 @@ describe("companyProfileSchema", () => {
       companyProfileSchema.parse({
         ...validPayload,
         companyType: "Agency"
+      })
+    ).toThrow();
+  });
+
+  it("rejects unsupported company_type request fields", () => {
+    expect(() =>
+      companyProfileSchema.parse({
+        ...validPayload,
+        company_type: "Agency"
       })
     ).toThrow();
   });

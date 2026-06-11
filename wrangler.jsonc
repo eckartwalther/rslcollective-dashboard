@@ -2,6 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "rslcollective-dashboard",
   "main": "worker/index.ts",
+  "account_id": "<CLOUDFLARE_ACCOUNT_ID_FOR_RSLCOLLECTIVE_ORG_ACCOUNT>",
   "compatibility_date": "2026-06-11",
   "assets": {
     "directory": "./dist/",
@@ -20,7 +21,7 @@
     {
       "binding": "DB",
       "database_name": "rsl-collective-dashboard",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "<D1_DATABASE_ID_FROM_SAME_CLOUDFLARE_ACCOUNT>"
     }
   ],
   "routes": [

@@ -9,6 +9,7 @@ export type WorkosAuthEnv = {
   WORKOS_LOGOUT_URI?: string;
   DASHBOARD_BASE_URL?: string;
   SESSION_SECRET?: string;
+  ENVIRONMENT?: string;
 };
 
 export type WorkosAuthorizationUrlOptions = {
@@ -101,6 +102,10 @@ export async function exchangeWorkosAuthorizationCode(env: WorkosAuthEnv, code: 
   });
 
   if (!response.ok) {
+    const responseBody = await response.text();
+
+    logWorkosExchangeFailure(env, response, responseBody, code);
+
     throw new Error("WorkOS authorization code exchange failed.");
   }
 
@@ -147,4 +152,46 @@ function mapWorkosAuthenticateResponse(response: WorkosAuthenticateResponse): Wo
     lastName: user.lastName ?? user.last_name ?? null,
     emailVerified: user.emailVerified ?? user.email_verified ?? false
   };
+}
+
+function logWorkosExchangeFailure(
+  env: WorkosAuthEnv,
+  response: Response,
+  responseBody: string,
+  code: string
+) {
+  if (env.ENVIRONMENT === "production") {
+    return;
+  }
+
+  console.error({
+    event: "workos_authorization_code_exchange_failed",
+    workosExchangeResponseStatus: response.status,
+    workosExchangeResponseStatusText: response.statusText,
+    workosExchangeResponseBody: redactWorkosExchangeBody(responseBody, env, code),
+    workosClientIdPresent: Boolean(env.WORKOS_CLIENT_ID),
+    workosClientId: redactClientId(env.WORKOS_CLIENT_ID),
+    workosApiKeyPresent: Boolean(env.WORKOS_API_KEY),
+    workosRedirectUri: env.WORKOS_REDIRECT_URI
+  });
+}
+
+function redactClientId(clientId: string | undefined) {
+  if (!clientId) {
+    return null;
+  }
+
+  return `${clientId.slice(0, 12)}...`;
+}
+
+function redactValue(value: string, secret: string) {
+  if (!secret) {
+    return value;
+  }
+
+  return value.split(secret).join("[redacted]");
+}
+
+function redactWorkosExchangeBody(value: string, env: WorkosAuthEnv, code: string) {
+  return redactValue(redactValue(value, code), env.WORKOS_API_KEY ?? "");
 }
