@@ -1,3 +1,4 @@
+import { WorkOS, type AuthenticationResponse } from "@workos-inc/node/worker";
 import { createSignedAuthState, normalizeReturnTo, type AuthFlow } from "./session";
 
 const workosAuthorizeUrl = "https://api.workos.com/user_management/authorize";
@@ -72,44 +73,21 @@ export type WorkosAuthenticatedUser = {
   emailVerified?: boolean;
 };
 
-type WorkosAuthenticateResponse = {
-  user?: {
-    id?: string;
-    email?: string;
-    firstName?: string | null;
-    first_name?: string | null;
-    lastName?: string | null;
-    last_name?: string | null;
-    emailVerified?: boolean;
-    email_verified?: boolean;
-  };
-};
-
 export async function exchangeWorkosAuthorizationCode(env: WorkosAuthEnv, code: string) {
   assertWorkosExchangeConfig(env);
+  const workos = new WorkOS(env.WORKOS_API_KEY);
 
-  const response = await fetch("https://api.workos.com/user_management/authenticate", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.WORKOS_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      client_id: env.WORKOS_CLIENT_ID,
+  try {
+    const response = await workos.userManagement.authenticateWithCode({
       code,
-      grant_type: "authorization_code"
-    })
-  });
+      clientId: env.WORKOS_CLIENT_ID
+    });
 
-  if (!response.ok) {
-    const responseBody = await response.text();
-
-    logWorkosExchangeFailure(env, response, responseBody, code);
-
+    return mapWorkosAuthenticateResponse(response);
+  } catch (error) {
+    logWorkosExchangeFailure(env, error, code);
     throw new Error("WorkOS authorization code exchange failed.");
   }
-
-  return mapWorkosAuthenticateResponse((await response.json()) as WorkosAuthenticateResponse);
 }
 
 export function assertWorkosExchangeConfig(
@@ -138,7 +116,7 @@ export function getWorkosLogoutUrl(env: WorkosAuthEnv) {
   return url.toString();
 }
 
-function mapWorkosAuthenticateResponse(response: WorkosAuthenticateResponse): WorkosAuthenticatedUser {
+function mapWorkosAuthenticateResponse(response: AuthenticationResponse): WorkosAuthenticatedUser {
   const user = response.user;
 
   if (!user?.id || !user.email) {
@@ -148,16 +126,15 @@ function mapWorkosAuthenticateResponse(response: WorkosAuthenticateResponse): Wo
   return {
     id: user.id,
     email: user.email,
-    firstName: user.firstName ?? user.first_name ?? null,
-    lastName: user.lastName ?? user.last_name ?? null,
-    emailVerified: user.emailVerified ?? user.email_verified ?? false
+    firstName: user.firstName ?? null,
+    lastName: user.lastName ?? null,
+    emailVerified: user.emailVerified ?? false
   };
 }
 
 function logWorkosExchangeFailure(
   env: WorkosAuthEnv,
-  response: Response,
-  responseBody: string,
+  error: unknown,
   code: string
 ) {
   if (env.ENVIRONMENT === "production") {
@@ -166,9 +143,9 @@ function logWorkosExchangeFailure(
 
   console.error({
     event: "workos_authorization_code_exchange_failed",
-    workosExchangeResponseStatus: response.status,
-    workosExchangeResponseStatusText: response.statusText,
-    workosExchangeResponseBody: redactWorkosExchangeBody(responseBody, env, code),
+    workosExchangeResponseStatus: getErrorStatus(error),
+    workosExchangeResponseStatusText: redactDiagnosticText(getErrorStatusText(error), env, code),
+    workosExchangeResponseBody: redactDiagnosticText(getErrorBody(error), env, code),
     workosClientIdPresent: Boolean(env.WORKOS_CLIENT_ID),
     workosClientId: redactClientId(env.WORKOS_CLIENT_ID),
     workosApiKeyPresent: Boolean(env.WORKOS_API_KEY),
@@ -192,6 +169,57 @@ function redactValue(value: string, secret: string) {
   return value.split(secret).join("[redacted]");
 }
 
-function redactWorkosExchangeBody(value: string, env: WorkosAuthEnv, code: string) {
-  return redactValue(redactValue(value, code), env.WORKOS_API_KEY ?? "");
+function redactDiagnosticText(value: string, env: WorkosAuthEnv, code: string) {
+  return redactValue(
+    redactValue(redactValue(value, code), env.WORKOS_API_KEY ?? ""),
+    env.WORKOS_CLIENT_ID ?? ""
+  );
+}
+
+function getErrorStatus(error: unknown) {
+  return getErrorProperty(error, "status");
+}
+
+function getErrorStatusText(error: unknown) {
+  const message = getErrorProperty(error, "message");
+
+  return typeof message === "string" ? message : "";
+}
+
+function getErrorBody(error: unknown) {
+  const rawData = getErrorProperty(error, "rawData");
+
+  if (rawData !== undefined) {
+    return stringifyDiagnosticValue(rawData);
+  }
+
+  const errorDescription = getErrorProperty(error, "errorDescription");
+
+  if (errorDescription !== undefined) {
+    return stringifyDiagnosticValue(errorDescription);
+  }
+
+  const message = getErrorProperty(error, "message");
+
+  return typeof message === "string" ? message : "";
+}
+
+function getErrorProperty(error: unknown, property: string) {
+  if (!error || typeof error !== "object" || !(property in error)) {
+    return undefined;
+  }
+
+  return (error as Record<string, unknown>)[property];
+}
+
+function stringifyDiagnosticValue(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable]";
+  }
 }

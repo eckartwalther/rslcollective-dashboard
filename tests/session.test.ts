@@ -138,15 +138,16 @@ describe("session utilities", () => {
 
     expect(cookie).toContain(`${SESSION_COOKIE_NAME}=token`);
     expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
     expect(cookie).toContain("SameSite=Lax");
     expect(cookie).toContain("Path=/");
     expect(cookie).not.toContain("Domain=");
   });
 
-  it("marks production session cookies as Secure", () => {
+  it("always marks __Host- session cookies as Secure", () => {
     const cookie = createSessionCookie("token", {
       expiresAt: "2026-07-11T00:00:00.000Z",
-      secure: true
+      secure: false
     });
 
     expect(cookie).toContain("Secure");
@@ -171,7 +172,10 @@ describe("session utilities", () => {
     expect(cookie).not.toContain("Domain=");
   });
 
-  it("creates a clearing cookie without a Domain attribute", () => {
-    expect(createClearSessionCookie({ secure: false })).not.toContain("Domain=");
+  it("creates a Secure clearing cookie without a Domain attribute", () => {
+    const cookie = createClearSessionCookie({ secure: false });
+
+    expect(cookie).toContain("Secure");
+    expect(cookie).not.toContain("Domain=");
   });
 });

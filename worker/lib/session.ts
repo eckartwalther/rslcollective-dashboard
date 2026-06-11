@@ -186,36 +186,30 @@ export function normalizeReturnTo(returnTo: string) {
 
 export function createSessionCookie(
   token: string,
-  options: { expiresAt: string; secure: boolean }
+  options: { expiresAt: string; secure?: boolean }
 ) {
   const cookie = [
     `${SESSION_COOKIE_NAME}=${token}`,
     "HttpOnly",
     "SameSite=Lax",
     "Path=/",
+    "Secure",
     `Expires=${new Date(options.expiresAt).toUTCString()}`
   ];
-
-  if (options.secure) {
-    cookie.push("Secure");
-  }
 
   return cookie.join("; ");
 }
 
-export function createClearSessionCookie(options: { secure: boolean }) {
+export function createClearSessionCookie(_options: { secure?: boolean } = {}) {
   const cookie = [
     `${SESSION_COOKIE_NAME}=`,
     "HttpOnly",
     "SameSite=Lax",
     "Path=/",
+    "Secure",
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
     "Max-Age=0"
   ];
-
-  if (options.secure) {
-    cookie.push("Secure");
-  }
 
   return cookie.join("; ");
 }

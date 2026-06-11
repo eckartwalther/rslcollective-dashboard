@@ -113,6 +113,23 @@ describe("POST /logout", () => {
     expect(response.headers.get("Location")).toBe("/login");
   });
 
+  it("clears the __Host- cookie with Secure in development", async () => {
+    const { routes } = createHarness();
+    const response = await logoutRequest(routes, {
+      env: { ENVIRONMENT: "development", DB: {} as D1Database },
+      headers: { Origin: "http://localhost:8787" }
+    });
+    const cookie = response.headers.get("Set-Cookie");
+
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).toContain("Max-Age=0");
+    expect(cookie).not.toContain("Domain=");
+  });
+
   it("invalidates the local D1 session when a session cookie is present", async () => {
     const token = "logout-token";
     const tokenHash = await hashSessionToken(token);
