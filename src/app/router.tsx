@@ -3,7 +3,7 @@ import { DashboardPage } from "../pages/DashboardPage";
 
 export const router = createBrowserRouter([
   {
-    path: "/dashboard",
+    path: "/dashboard/*",
     element: <DashboardPage />
   },
   {

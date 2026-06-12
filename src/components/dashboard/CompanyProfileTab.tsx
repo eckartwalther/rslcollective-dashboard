@@ -1,6 +1,10 @@
-import { Alert, Loader, Stack, Text, Title } from "@mantine/core";
+import { Button, Stack, Text } from "@mantine/core";
 import { useCompanyQuery } from "../../api/company";
 import { CompanyProfileForm } from "../forms/CompanyProfileForm";
+import { EmptyState } from "../layout/EmptyState";
+import { ErrorState } from "../layout/ErrorState";
+import { LoadingState } from "../layout/LoadingState";
+import { PageHeader } from "../layout/PageHeader";
 
 type CompanyProfileTabProps = {
   authenticated: boolean;
@@ -11,25 +15,38 @@ export function CompanyProfileTab({ authenticated }: CompanyProfileTabProps) {
   const company = companyQuery.data?.company;
 
   return (
-    <Stack gap="sm">
-      <Title order={2} size="h4">
-        Company Profile
-      </Title>
+    <Stack gap="lg">
+      <PageHeader
+        title="Company Profile"
+        description="Create or edit the publisher company details used for the phase-one RSL Collective profile application."
+      />
       {companyQuery.isLoading || companyQuery.isFetching ? (
-        <Stack align="flex-start" gap="sm">
-          <Loader size="sm" aria-label="Loading company profile" />
-          <Text c="dimmed">Loading company profile...</Text>
+        <Stack gap="sm">
+          <Text c="dimmed" size="sm">
+            Loading company profile...
+          </Text>
+          <LoadingState rows={6} />
         </Stack>
       ) : companyQuery.isError ? (
-        <Alert color="red" title="Company profile unavailable">
-          Company profile details could not be loaded.
-        </Alert>
+        <ErrorState
+          title="Company profile unavailable"
+          description="Company profile details could not be loaded."
+        />
       ) : company ? (
         <CompanyProfileForm company={company} />
       ) : (
         <Stack gap="md">
-          <Text c="dimmed">
-            No company profile has been created yet. Add the basic company details to create your profile.
+          <EmptyState
+            title="No company profile"
+            description="No company profile has been created yet. Add the basic company details to create your profile."
+            action={
+              <Button variant="light" size="xs" disabled>
+                Profile form ready below
+              </Button>
+            }
+          />
+          <Text c="dimmed" size="sm">
+            Fields are limited to the phase-one company profile scope.
           </Text>
           <CompanyProfileForm company={null} />
         </Stack>

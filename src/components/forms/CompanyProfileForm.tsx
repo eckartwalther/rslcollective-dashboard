@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Paper, Select, Stack, TextInput, Textarea } from "@mantine/core";
+import { Alert, Button, Card, Select, SimpleGrid, Stack, TextInput, Textarea } from "@mantine/core";
 import { FormEvent, useEffect, useState } from "react";
 import { ZodError } from "zod";
 import { ApiError } from "../../api/client";
@@ -7,6 +7,7 @@ import {
   companyProfileSchema,
   companyTypeValues
 } from "../../schemas/company";
+import { FormSection } from "./FormSection";
 
 type CompanyProfileFormProps = {
   company: Company | null;
@@ -90,8 +91,8 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
   }
 
   return (
-    <Paper component="form" withBorder radius="md" p="lg" noValidate onSubmit={handleSubmit}>
-      <Stack gap="md">
+    <Card component="form" withBorder radius="sm" p="md" noValidate onSubmit={handleSubmit}>
+      <Stack gap="lg">
         {saved ? (
           <Alert color="green" title="Company profile saved">
             Your company profile has been saved.
@@ -99,108 +100,144 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
         ) : null}
         {formMessage ? (
           <Alert color="red" title="Company profile could not be saved">
-            {formMessage}
+          {formMessage}
           </Alert>
         ) : null}
 
-        <TextInput
-          label="Legal company name"
-          value={values.legalName}
-          error={fieldErrors.legalName}
-          required
-          onChange={(event) => updateValue("legalName", event.currentTarget.value)}
-        />
-        <TextInput
-          label="Display name"
-          value={values.displayName ?? ""}
-          error={fieldErrors.displayName}
-          onChange={(event) => updateValue("displayName", event.currentTarget.value)}
-        />
-        <Select
-          label="Company type"
-          data={[...companyTypeValues]}
-          value={values.companyType ?? null}
-          error={fieldErrors.companyType}
-          clearable
-          onChange={(value) => updateValue("companyType", toCompanyTypeValue(value))}
-        />
-        <TextInput
-          label="Primary contact name"
-          value={values.primaryContactName}
-          error={fieldErrors.primaryContactName}
-          required
-          onChange={(event) => updateValue("primaryContactName", event.currentTarget.value)}
-        />
-        <TextInput
-          label="Primary contact email"
-          type="email"
-          value={values.primaryContactEmail}
-          error={fieldErrors.primaryContactEmail}
-          required
-          onChange={(event) => updateValue("primaryContactEmail", event.currentTarget.value)}
-        />
-        <TextInput
-          label="Billing contact email"
-          type="email"
-          value={values.billingContactEmail ?? ""}
-          error={fieldErrors.billingContactEmail}
-          onChange={(event) => updateValue("billingContactEmail", event.currentTarget.value)}
-        />
-        <Group grow align="flex-start">
-          <TextInput
-            label="Country"
-            value={values.country}
-            error={fieldErrors.country}
-            required
-            onChange={(event) => updateValue("country", event.currentTarget.value)}
-          />
-          <TextInput
-            label="State/region"
-            value={values.region ?? ""}
-            error={fieldErrors.region}
-            onChange={(event) => updateValue("region", event.currentTarget.value)}
-          />
-        </Group>
-        <Group grow align="flex-start">
-          <TextInput
-            label="City"
-            value={values.city ?? ""}
-            error={fieldErrors.city}
-            onChange={(event) => updateValue("city", event.currentTarget.value)}
-          />
-          <TextInput
-            label="Postal code"
-            value={values.postalCode ?? ""}
-            error={fieldErrors.postalCode}
-            onChange={(event) => updateValue("postalCode", event.currentTarget.value)}
-          />
-        </Group>
-        <TextInput
-          label="Business address line 1"
-          value={values.addressLine1 ?? ""}
-          error={fieldErrors.addressLine1}
-          onChange={(event) => updateValue("addressLine1", event.currentTarget.value)}
-        />
-        <TextInput
-          label="Business address line 2"
-          value={values.addressLine2 ?? ""}
-          error={fieldErrors.addressLine2}
-          onChange={(event) => updateValue("addressLine2", event.currentTarget.value)}
-        />
-        <Textarea
-          label="Company description"
-          value={values.description ?? ""}
-          error={fieldErrors.description}
-          autosize
-          minRows={4}
-          onChange={(event) => updateValue("description", event.currentTarget.value)}
-        />
+        <FormSection
+          title="Company identity"
+          description="Core publisher identity details for the profile record."
+          withDivider={false}
+        >
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <TextInput
+              label="Legal company name"
+              value={values.legalName}
+              error={fieldErrors.legalName}
+              required
+              onChange={(event) => updateValue("legalName", event.currentTarget.value)}
+            />
+            <TextInput
+              label="Display name"
+              value={values.displayName ?? ""}
+              error={fieldErrors.displayName}
+              onChange={(event) => updateValue("displayName", event.currentTarget.value)}
+            />
+            <Select
+              label="Company type"
+              data={[...companyTypeValues]}
+              value={values.companyType ?? null}
+              error={fieldErrors.companyType}
+              clearable
+              onChange={(value) => updateValue("companyType", toCompanyTypeValue(value))}
+            />
+          </SimpleGrid>
+        </FormSection>
 
-        <Button type="submit" loading={saveCompanyMutation.isPending}>
+        <FormSection
+          title="Primary contact"
+          description="Main representative contact for this publisher profile."
+        >
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <TextInput
+              label="Primary contact name"
+              value={values.primaryContactName}
+              error={fieldErrors.primaryContactName}
+              required
+              onChange={(event) => updateValue("primaryContactName", event.currentTarget.value)}
+            />
+            <TextInput
+              label="Primary contact email"
+              type="email"
+              value={values.primaryContactEmail}
+              error={fieldErrors.primaryContactEmail}
+              required
+              onChange={(event) => updateValue("primaryContactEmail", event.currentTarget.value)}
+            />
+          </SimpleGrid>
+        </FormSection>
+
+        <FormSection
+          title="Billing contact"
+          description="Optional billing contact for future operational follow-up."
+        >
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <TextInput
+              label="Billing contact email"
+              type="email"
+              value={values.billingContactEmail ?? ""}
+              error={fieldErrors.billingContactEmail}
+              onChange={(event) => updateValue("billingContactEmail", event.currentTarget.value)}
+            />
+          </SimpleGrid>
+        </FormSection>
+
+        <FormSection
+          title="Address"
+          description="Basic business address details for the publisher profile."
+        >
+          <Stack gap="sm">
+            <SimpleGrid cols={{ base: 1, sm: 2 }}>
+              <TextInput
+                label="Country"
+                value={values.country}
+                error={fieldErrors.country}
+                required
+                onChange={(event) => updateValue("country", event.currentTarget.value)}
+              />
+              <TextInput
+                label="State/region"
+                value={values.region ?? ""}
+                error={fieldErrors.region}
+                onChange={(event) => updateValue("region", event.currentTarget.value)}
+              />
+              <TextInput
+                label="City"
+                value={values.city ?? ""}
+                error={fieldErrors.city}
+                onChange={(event) => updateValue("city", event.currentTarget.value)}
+              />
+              <TextInput
+                label="Postal code"
+                value={values.postalCode ?? ""}
+                error={fieldErrors.postalCode}
+                onChange={(event) => updateValue("postalCode", event.currentTarget.value)}
+              />
+            </SimpleGrid>
+            <TextInput
+              label="Business address line 1"
+              value={values.addressLine1 ?? ""}
+              error={fieldErrors.addressLine1}
+              onChange={(event) => updateValue("addressLine1", event.currentTarget.value)}
+            />
+            <TextInput
+              label="Business address line 2"
+              value={values.addressLine2 ?? ""}
+              error={fieldErrors.addressLine2}
+              onChange={(event) => updateValue("addressLine2", event.currentTarget.value)}
+            />
+          </Stack>
+        </FormSection>
+
+        <FormSection
+          title="Description"
+          description="Optional short context about the company."
+        >
+          <Textarea
+            label="Company description"
+            value={values.description ?? ""}
+            error={fieldErrors.description}
+            autosize
+            minRows={4}
+            onChange={(event) => updateValue("description", event.currentTarget.value)}
+          />
+        </FormSection>
+
+        <Button type="submit" loading={saveCompanyMutation.isPending} w="fit-content">
           Save company profile
         </Button>
       </Stack>
-    </Paper>
+    </Card>
   );
 
   function updateValue<Field extends keyof CompanyProfileFormValues>(

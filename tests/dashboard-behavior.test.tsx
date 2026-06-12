@@ -136,7 +136,7 @@ describe("dashboard behavior", () => {
     expect(text).not.toContain("token_hash");
   });
 
-  it("opens Company Profile automatically for a user with no company", async () => {
+  it("lands on Dashboard home by default for a user with no company", async () => {
     mockDashboardFetch(
       authenticatedSession({
         hasCompany: false
@@ -146,30 +146,63 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    expect(await screen.findByText(/no company profile has been created yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /company profile/i })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByText("Create your company profile")).toBeInTheDocument();
+    expect(screen.getByText("Only Company Profile is available in this phase.")).toBeInTheDocument();
   });
 
-  it("lets a user with a company view Account Information and Company Profile tabs", async () => {
+  it("renders sidebar navigation and disabled future modules", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    expect(await screen.findByText("Company role")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /account information/i })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    expect(await screen.findByRole("button", { name: /^Dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Company Profile/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Account Information/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Repertoire/i })).toHaveAttribute("data-disabled", "true");
+    expect(screen.getByRole("button", { name: /^Licensee Exclusions/i })).toHaveAttribute("data-disabled", "true");
+    expect(screen.getByRole("button", { name: /^Reporting/i })).toHaveAttribute("data-disabled", "true");
+  });
 
-    fireEvent.click(screen.getByRole("tab", { name: /company profile/i }));
+  it("lets a user navigate from Dashboard to Company Profile and Account Information", async () => {
+    mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Company Profile/i }));
 
     expect(await screen.findByDisplayValue("Example Media Inc.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /company profile/i })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Account Information/i }));
+
+    expect(await screen.findByText("Company role")).toBeInTheDocument();
+    expect(screen.getByText("owner")).toBeInTheDocument();
+  });
+
+  it("shows company summary and static future status cards for an existing company", async () => {
+    mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    expect(await screen.findByText("Company summary")).toBeInTheDocument();
+    expect(screen.getByText("Example Media Inc.")).toBeInTheDocument();
+    expect(screen.getAllByText("Repertoire").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Coming soon").length).toBeGreaterThan(0);
+    expect(screen.getByText("Next steps coming soon")).toBeInTheDocument();
+  });
+
+  it("does not make future-module API calls for static dashboard cards", async () => {
+    const fetchMock = mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    await screen.findByText("Company summary");
+    const calledPaths = fetchMock.mock.calls.map(([path]) => path);
+
+    expect(calledPaths).toEqual(expect.arrayContaining(["/api/session", "/api/company"]));
+    expect(calledPaths).not.toContain("/api/repertoire");
+    expect(calledPaths).not.toContain("/api/reporting");
+    expect(calledPaths).not.toContain("/api/licensee-exclusions");
   });
 });

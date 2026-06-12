@@ -247,7 +247,7 @@ describe("CompanyProfileForm", () => {
     expect(await screen.findByText("Your company profile has been saved.")).toBeInTheDocument();
   });
 
-  it("opens the Company Profile tab automatically for an authenticated user with no company", async () => {
+  it("opens the Dashboard home first and then navigates to Company Profile for a user with no company", async () => {
     const fetchMock = vi.fn((path: string) => {
       if (path === "/api/session") {
         return Promise.resolve(
@@ -274,10 +274,11 @@ describe("CompanyProfileForm", () => {
 
     renderWithProviders(<DashboardPage />);
 
+    expect(await screen.findByText("Create your company profile")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Company Profile/i }));
+
     expect(await screen.findByText(/no company profile has been created yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /company profile/i })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    expect(screen.getByLabelText(/^Legal company name/i)).toBeInTheDocument();
   });
 });

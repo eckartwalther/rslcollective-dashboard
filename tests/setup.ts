@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
 
 class ResizeObserverMock {
   observe() {
@@ -38,4 +39,14 @@ if (typeof window !== "undefined") {
 Object.defineProperty(globalThis, "ResizeObserver", {
   writable: true,
   value: ResizeObserverMock
+});
+
+afterEach(() => {
+  if (typeof document !== "undefined") {
+    document.querySelectorAll('form[action="/logout"]').forEach((form) => form.remove());
+  }
+
+  if (typeof window !== "undefined") {
+    window.history.replaceState(null, "", "/dashboard");
+  }
 });
