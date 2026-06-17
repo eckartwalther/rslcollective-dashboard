@@ -43,7 +43,7 @@ const optionalEmail = z.preprocess(
 
 export const companyProfileSchema = z
   .strictObject({
-    legalName: requiredString("Legal company name", 2, 200),
+    legalName: requiredString("Legal publisher name", 2, 200),
     displayName: optionalString(200),
     companyType: z.enum(companyTypeValues).nullable().optional(),
     primaryContactName: requiredString("Primary contact name", 2, 200),

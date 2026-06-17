@@ -1,5 +1,6 @@
-import { Badge, Button, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
-import { LogOut } from "lucide-react";
+import { Alert, Badge, Button, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { LogOut, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { SessionUser } from "../../api/session";
 import { PageHeader } from "../layout/PageHeader";
 
@@ -8,17 +9,28 @@ type AccountTabProps = {
   onSignOut: () => void;
 };
 
+const accountCopy = {
+  dangerTitle: "Danger zone",
+  dangerDescription:
+    "Deleting an account may remove access to this dashboard and the publisher profile associated with it.",
+  deleteButton: "Delete account",
+  deleteRequestTitle: "Account deletion request",
+  deleteRequestDescription:
+    "Account deletion is handled by RSL Collective support for now. No account, session, or publisher profile records were deleted from this dashboard."
+};
+
 export function AccountTab({ user, onSignOut }: AccountTabProps) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const [deleteRequestVisible, setDeleteRequestVisible] = useState(false);
 
   return (
     <Stack gap="lg">
       <PageHeader
         title="Account Information"
-        description="Review the authenticated account associated with this RSL Collective profile application session."
+        description="Review the authenticated account associated with this RSL Collective dashboard session."
         badge={
           <Badge color={user.hasCompany ? "green" : "yellow"} variant="light">
-            {user.hasCompany ? "Company profile complete" : "Company profile needed"}
+            {user.hasCompany ? "Publisher profile complete" : "Publisher profile needed"}
           </Badge>
         }
       />
@@ -31,9 +43,9 @@ export function AccountTab({ user, onSignOut }: AccountTabProps) {
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <AccountField label="Email" value={user.email} />
             {fullName ? <AccountField label="Name" value={fullName} /> : null}
-            <AccountField label="Company role" value={user.role} textTransform="capitalize" />
+            <AccountField label="Publisher role" value={user.role} textTransform="capitalize" />
             <AccountField
-              label="Company profile"
+              label="Publisher profile"
               value={user.hasCompany ? "Exists" : "Not created"}
             />
           </SimpleGrid>
@@ -44,6 +56,30 @@ export function AccountTab({ user, onSignOut }: AccountTabProps) {
             w="fit-content"
           >
             Sign out
+          </Button>
+        </Stack>
+      </Card>
+
+      <Card withBorder radius="sm" p="md" bd="1px solid var(--mantine-color-red-3)">
+        <Stack gap="md" align="flex-start">
+          <Title order={2} size="h4" c="red">
+            {accountCopy.dangerTitle}
+          </Title>
+          <Text size="sm" c="dimmed">
+            {accountCopy.dangerDescription}
+          </Text>
+          {deleteRequestVisible ? (
+            <Alert color="red" variant="light" title={accountCopy.deleteRequestTitle}>
+              {accountCopy.deleteRequestDescription}
+            </Alert>
+          ) : null}
+          <Button
+            color="red"
+            variant="light"
+            leftSection={<Trash2 size={16} />}
+            onClick={() => setDeleteRequestVisible(true)}
+          >
+            {accountCopy.deleteButton}
           </Button>
         </Stack>
       </Card>

@@ -21,7 +21,6 @@ type CompanyProfileFormValues = {
   companyType: CompanyTypeValue | null;
   primaryContactName: string;
   primaryContactEmail: string;
-  billingContactEmail: string;
   country: string;
   region: string;
   city: string;
@@ -39,7 +38,6 @@ const emptyValues = {
   companyType: null,
   primaryContactName: "",
   primaryContactEmail: "",
-  billingContactEmail: "",
   country: "",
   region: "",
   city: "",
@@ -94,12 +92,12 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
     <Card component="form" withBorder radius="sm" p="md" noValidate onSubmit={handleSubmit}>
       <Stack gap="lg">
         {saved ? (
-          <Alert color="green" title="Company profile saved">
-            Your company profile has been saved.
+          <Alert color="green" title="Publisher profile saved">
+            Your publisher profile has been saved.
           </Alert>
         ) : null}
         {formMessage ? (
-          <Alert color="red" title="Company profile could not be saved">
+          <Alert color="red" title="Publisher profile could not be saved">
           {formMessage}
           </Alert>
         ) : null}
@@ -111,7 +109,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
         >
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput
-              label="Legal company name"
+              label="Legal publisher name"
               value={values.legalName}
               error={fieldErrors.legalName}
               required
@@ -124,7 +122,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
               onChange={(event) => updateValue("displayName", event.currentTarget.value)}
             />
             <Select
-              label="Company type"
+              label="Publisher type"
               data={[...companyTypeValues]}
               value={values.companyType ?? null}
               error={fieldErrors.companyType}
@@ -153,21 +151,6 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
               error={fieldErrors.primaryContactEmail}
               required
               onChange={(event) => updateValue("primaryContactEmail", event.currentTarget.value)}
-            />
-          </SimpleGrid>
-        </FormSection>
-
-        <FormSection
-          title="Billing contact"
-          description="Optional billing contact for future operational follow-up."
-        >
-          <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <TextInput
-              label="Billing contact email"
-              type="email"
-              value={values.billingContactEmail ?? ""}
-              error={fieldErrors.billingContactEmail}
-              onChange={(event) => updateValue("billingContactEmail", event.currentTarget.value)}
             />
           </SimpleGrid>
         </FormSection>
@@ -224,7 +207,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
           description="Optional short context about the company."
         >
           <Textarea
-            label="Company description"
+            label="Publisher description"
             value={values.description ?? ""}
             error={fieldErrors.description}
             autosize
@@ -234,7 +217,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
         </FormSection>
 
         <Button type="submit" loading={saveCompanyMutation.isPending} w="fit-content">
-          Save company profile
+          Save publisher profile
         </Button>
       </Stack>
     </Card>
@@ -267,7 +250,6 @@ function companyToFormValues(company: Company | null): CompanyProfileFormValues 
     companyType: toCompanyTypeValue(company.companyType),
     primaryContactName: company.primaryContactName,
     primaryContactEmail: company.primaryContactEmail,
-    billingContactEmail: company.billingContactEmail ?? "",
     country: company.country,
     region: company.region ?? "",
     city: company.city ?? "",
@@ -302,14 +284,20 @@ function getApiValidationError(error: unknown): {
 } {
   if (error instanceof ApiError && isApiErrorBody(error.body)) {
     return {
-      message: error.body.error.message,
+      message: publisherProfileMessage(error.body.error.message),
       fields: error.body.error.fields as FieldErrors | undefined
     };
   }
 
   return {
-    message: "Company profile could not be saved."
+    message: "Publisher profile could not be saved."
   };
+}
+
+function publisherProfileMessage(message: string) {
+  return message
+    .replaceAll("Company profile", "Publisher profile")
+    .replaceAll("company profile", "publisher profile");
 }
 
 function isApiErrorBody(body: unknown): body is {

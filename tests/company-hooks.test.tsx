@@ -209,7 +209,7 @@ describe("company API hooks", () => {
       </AppProviders>
     );
 
-    expect(screen.getByText(/loading company profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading publisher profile/i)).toBeInTheDocument();
   });
 
   it("renders the empty company placeholder state", async () => {
@@ -221,7 +221,7 @@ describe("company API hooks", () => {
       </AppProviders>
     );
 
-    expect(await screen.findByText(/no company profile has been created yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no publisher profile has been created yet/i)).toBeInTheDocument();
   });
 
   it("renders the existing company form state", async () => {

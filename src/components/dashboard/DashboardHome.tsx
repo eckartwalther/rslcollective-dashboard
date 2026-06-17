@@ -10,13 +10,13 @@ import {
   Title
 } from "@mantine/core";
 import {
-  BadgeCheck,
   Ban,
   BarChart3,
   Building2,
   ClipboardCheck,
+  CreditCard,
   Library,
-  Rocket
+  ShieldCheck
 } from "lucide-react";
 import type { SessionUser } from "../../api/session";
 import type { Company } from "../../api/company";
@@ -33,6 +33,60 @@ type DashboardHomeProps = {
   onNavigateToCompany: () => void;
 };
 
+const dashboardCopy = {
+  headerDescription:
+    "Manage the publisher profile that identifies your organization for RSL Collective participation. RSL Collective review and approval unlock the additional repertoire, exclusion, reporting, enrollment, and payment capabilities in this workflow.",
+  noCompanyNextStep:
+    "Create your publisher profile so the RSL Collective can verify your publisher account.",
+  noCompanyVerification:
+    "Verification begins after the profile is complete. Additional capabilities remain locked until publisher approval.",
+  companyReview:
+    "Your publisher profile is saved. The RSL Collective will review and approve the publisher before enabling additional capabilities.",
+  companyProfile: {
+    title: "Publisher profile",
+    complete: "Basic publisher identity and contact details are saved.",
+    notStarted: "Create the publisher profile to begin publisher verification."
+  },
+  verification: {
+    title: "Publisher verification",
+    pendingReview:
+      "Complete and verify your RSL Collective publisher profile.",
+    waitingForProfile: "Complete and verify your RSL Collective publisher profile."
+  },
+  capabilities: [
+    {
+      title: "Define your licensable content repertoire",
+      approvedDescription: "Repertoire setup is available after publisher approval and onboarding.",
+      waitingDescription: "Repertoire setup is locked until publisher verification can begin.",
+      icon: Library
+    },
+    {
+      title: "Manage licensee exclusions",
+      approvedDescription: "Licensee exclusion controls are available after RSL Collective approval.",
+      waitingDescription: "Licensee exclusion controls are locked until publisher verification can begin.",
+      icon: Ban
+    },
+    {
+      title: "Review reporting activity",
+      approvedDescription: "Reporting access is available after approval and onboarding.",
+      waitingDescription: "Reporting access is locked until publisher verification can begin.",
+      icon: BarChart3
+    },
+    {
+      title: "Prepare enrollment readiness",
+      approvedDescription: "Enrollment readiness depends on RSL Collective approval of this publisher.",
+      waitingDescription: "Complete the publisher profile to begin publisher verification.",
+      icon: ClipboardCheck
+    },
+    {
+      title: "Set up licensing payments",
+      approvedDescription: "Payment setup is available after publisher approval and onboarding.",
+      waitingDescription: "Payment setup is locked until publisher verification can begin.",
+      icon: CreditCard
+    }
+  ]
+};
+
 export function DashboardHome({
   user,
   company,
@@ -41,15 +95,17 @@ export function DashboardHome({
   onNavigateToCompany
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
+  const verificationStatus = hasCompany ? "Pending review" : "Waiting for publisher profile";
+  const capabilityStatus = hasCompany ? "Pending approval" : "Pending verification";
 
   return (
     <Stack gap="lg">
       <PageHeader
         title="Dashboard"
-        description="Manage the publisher profile that identifies your company for RSL Collective participation. More onboarding, repertoire, exclusion, and reporting workflows will be added here later."
+        description={dashboardCopy.headerDescription}
         badge={
           <Badge color="blue" variant="light">
-            Phase one
+            Beta
           </Badge>
         }
       />
@@ -58,8 +114,8 @@ export function DashboardHome({
 
       {isCompanyError ? (
         <ErrorState
-          title="Company profile unavailable"
-          description="The dashboard could not load company profile details. Account information and sign-out are still available."
+          title="Publisher profile unavailable"
+          description="The dashboard could not load publisher profile details. Account information and sign-out are still available."
         />
       ) : null}
 
@@ -72,18 +128,18 @@ export function DashboardHome({
               </ThemeIcon>
               <Stack gap="xs" maw={680}>
                 <Title order={2} size="h4">
-                  Create your company profile
+                  Create your publisher profile
                 </Title>
                 <Text size="sm" c="dimmed">
-                  The company profile identifies the publisher company representative and is required before later onboarding and enrollment steps can become available.
+                  {dashboardCopy.noCompanyNextStep}
                 </Text>
                 <Text size="sm" c="dimmed">
-                  Only Company Profile is available in this phase.
+                  {dashboardCopy.noCompanyVerification}
                 </Text>
               </Stack>
             </Group>
             <Button leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-              Create company profile
+              Create publisher profile
             </Button>
           </Group>
         </Card>
@@ -96,24 +152,27 @@ export function DashboardHome({
               <Stack gap={4}>
                 <Group gap="xs">
                   <Title order={2} size="h4">
-                    Company summary
+                    Publisher summary
                   </Title>
                   <Badge color="green" variant="light">
                     Complete
                   </Badge>
                 </Group>
                 <Text size="sm" c="dimmed">
-                  Your publisher company profile is saved and ready for the next phase of the RSL Collective workflow.
+                  {dashboardCopy.companyReview}
                 </Text>
+                <Badge color="yellow" variant="light" w="fit-content">
+                  Publisher verification: Pending review
+                </Badge>
               </Stack>
               <Button variant="default" leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-                Edit company profile
+                Edit publisher profile
               </Button>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
               <SummaryItem label="Legal name" value={company.legalName} />
               <SummaryItem label="Display name" value={company.displayName} />
-              <SummaryItem label="Company type" value={company.companyType} />
+              <SummaryItem label="Publisher type" value={company.companyType} />
               <SummaryItem label="Country" value={company.country} />
               <SummaryItem label="Primary contact" value={company.primaryContactName} />
               <SummaryItem label="Contact email" value={company.primaryContactEmail} />
@@ -124,12 +183,12 @@ export function DashboardHome({
 
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <StatusCard
-          title="Company profile"
+          title={dashboardCopy.companyProfile.title}
           status={hasCompany ? "Complete" : "Not started"}
           description={
             hasCompany
-              ? "Basic publisher identity and contact details are saved."
-              : "Create the company profile before later enrollment steps can begin."
+              ? dashboardCopy.companyProfile.complete
+              : dashboardCopy.companyProfile.notStarted
           }
           icon={Building2}
           color={hasCompany ? "green" : "yellow"}
@@ -140,44 +199,28 @@ export function DashboardHome({
           }
         />
         <StatusCard
-          title="Repertoire"
-          status="Coming soon"
-          description="Repertoire configuration is not available in this phase."
-          icon={Library}
-          color="gray"
-        />
-        <StatusCard
-          title="Licensee exclusions"
-          status="Coming soon"
-          description="Licensee exclusion settings are static for now and are not connected to an API."
-          icon={Ban}
-          color="gray"
-        />
-        <StatusCard
-          title="Reporting"
-          status="Not configured"
-          description="Reporting setup will become available in a later workflow."
-          icon={BarChart3}
-          color="gray"
-        />
-        <StatusCard
-          title="Enrollment readiness"
-          status={hasCompany ? "Next steps coming soon" : "Waiting for company profile"}
+          title={dashboardCopy.verification.title}
+          status={verificationStatus}
           description={
             hasCompany
-              ? "The next onboarding steps will appear here when they are ready."
-              : "Enrollment readiness depends on completing the company profile first."
+              ? dashboardCopy.verification.pendingReview
+              : dashboardCopy.verification.waitingForProfile
           }
-          icon={hasCompany ? Rocket : ClipboardCheck}
-          color={hasCompany ? "blue" : "orange"}
+          icon={ShieldCheck}
+          color={hasCompany ? "yellow" : "orange"}
         />
-        <StatusCard
-          title="License setup"
-          status="Not configured"
-          description="License setup is previewed here only as a future RSL Collective module."
-          icon={BadgeCheck}
-          color="gray"
-        />
+        {dashboardCopy.capabilities.map((capability) => (
+          <StatusCard
+            key={capability.title}
+            title={capability.title}
+            status={capabilityStatus}
+            description={
+              hasCompany ? capability.approvedDescription : capability.waitingDescription
+            }
+            icon={capability.icon}
+            color="gray"
+          />
+        ))}
       </SimpleGrid>
     </Stack>
   );

@@ -1,13 +1,12 @@
 import {
   AppShell,
-  Badge,
   Burger,
   Button,
   Group,
+  Image,
   NavLink,
   Stack,
   Text,
-  Title,
   Tooltip,
   useMantineTheme
 } from "@mantine/core";
@@ -42,16 +41,17 @@ type NavigationItem = {
   view?: DashboardView;
   icon: LucideIcon;
   disabled?: boolean;
+  disabledReason?: string;
 };
 
 const navigationItems: NavigationItem[] = [
   { label: "Dashboard", view: "dashboard", icon: LayoutDashboard },
-  { label: "Company Profile", view: "company", icon: Building2 },
+  { label: "Publisher Profile", view: "company", icon: Building2 },
   { label: "Account Information", view: "account", icon: UserRound },
-  { label: "Repertoire", icon: Library, disabled: true },
-  { label: "Licensee Exclusions", icon: Ban, disabled: true },
-  { label: "Reporting", icon: BarChart3, disabled: true },
-  { label: "Settings", icon: Settings, disabled: true }
+  { label: "Repertoire", icon: Library, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Licensee Exclusions", icon: Ban, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Reporting", icon: BarChart3, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Settings", icon: Settings, disabled: true, disabledReason: "Available after RSL Collective approval" }
 ];
 
 export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
@@ -73,7 +73,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
 
   const activeTitle = useMemo(() => {
     if (activeView === "company") {
-      return "Company Profile";
+      return "Publisher Profile";
     }
 
     if (activeView === "account") {
@@ -98,16 +98,13 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="md" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Stack gap={0}>
-              <Group gap={8} wrap="nowrap">
-                <Title order={2} size="h4" lh={1}>
-                  RSL Collective
-                </Title>
-              </Group>
-              <Text size="xs" c="dimmed">
-                Profile application
-              </Text>
-            </Stack>
+            <Image
+              src="/brand/rsl-internet-collective-logo.svg"
+              alt="RSL Internet Collective"
+              h={32}
+              w="auto"
+              fit="contain"
+            />
           </Group>
 
           <Group gap="sm" wrap="nowrap">
@@ -155,13 +152,8 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
                   type="button"
                   label={item.label}
                   leftSection={<Icon size={16} strokeWidth={1.8} />}
-                  rightSection={
-                    item.disabled ? (
-                      <Badge size="xs" color="gray" variant="light">
-                        Soon
-                      </Badge>
-                    ) : null
-                  }
+                  title={item.disabledReason}
+                  aria-label={item.disabled ? `${item.label}. ${item.disabledReason}` : item.label}
                   active={active}
                   disabled={item.disabled}
                   color={theme.primaryColor}
@@ -188,12 +180,6 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
                 />
               );
             })}
-          </Stack>
-
-          <Stack gap="xs" mt="auto">
-            <Text size="xs" c="dimmed">
-              Future modules are visible for orientation only. They are not configured yet.
-            </Text>
           </Stack>
         </Stack>
       </AppShell.Navbar>

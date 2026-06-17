@@ -22,6 +22,11 @@ function renderAccountTab(user: SessionUser = userWithCompany, onSignOut = vi.fn
 }
 
 describe("AccountTab", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("displays email from the session", () => {
     renderAccountTab();
 
@@ -45,17 +50,17 @@ describe("AccountTab", () => {
     expect(screen.getByText("jane@example.com")).toBeInTheDocument();
   });
 
-  it("displays company role", () => {
+  it("displays publisher role", () => {
     renderAccountTab();
 
-    expect(screen.getByText("Company role")).toBeInTheDocument();
+    expect(screen.getByText("Publisher role")).toBeInTheDocument();
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
-  it("displays whether a company profile exists", () => {
+  it("displays whether a publisher profile exists", () => {
     renderAccountTab();
 
-    expect(screen.getByText("Company profile")).toBeInTheDocument();
+    expect(screen.getByText("Publisher profile")).toBeInTheDocument();
     expect(screen.getByText("Exists")).toBeInTheDocument();
 
     renderAccountTab({
@@ -73,5 +78,25 @@ describe("AccountTab", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a destructive account deletion request section", () => {
+    renderAccountTab();
+
+    expect(screen.getByText("Danger zone")).toBeInTheDocument();
+    expect(screen.getByText(/publisher profile associated with it/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /delete account/i })).toBeInTheDocument();
+  });
+
+  it("explains account deletion is a support request and does not call a delete API", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    renderAccountTab();
+
+    fireEvent.click(screen.getByRole("button", { name: /delete account/i }));
+
+    expect(screen.getByText("Account deletion request")).toBeInTheDocument();
+    expect(screen.getByText(/handled by RSL Collective support/i)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

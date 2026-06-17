@@ -76,12 +76,16 @@ describe("dashboard behavior", () => {
     vi.unstubAllGlobals();
   });
 
-  it("displays the RSL Collective shell and signed-in user email from session", async () => {
+  it("displays the RSL Internet Collective logo and signed-in user email from session", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    expect(await screen.findByRole("heading", { name: "RSL Collective" })).toBeInTheDocument();
+    const logo = await screen.findByRole("img", { name: "RSL Internet Collective" });
+
+    expect(logo).toHaveAttribute("src", "/brand/rsl-internet-collective-logo.svg");
+    expect(screen.queryByText("RSL Collective")).not.toBeInTheDocument();
+    expect(screen.queryByText("Profile application")).not.toBeInTheDocument();
     expect(screen.getAllByText("jane@example.com").length).toBeGreaterThan(0);
   });
 
@@ -147,62 +151,107 @@ describe("dashboard behavior", () => {
     renderDashboard();
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(await screen.findByText("Create your company profile")).toBeInTheDocument();
-    expect(screen.getByText("Only Company Profile is available in this phase.")).toBeInTheDocument();
+    expect(await screen.findByText("Create your publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for publisher profile")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 
-  it("renders sidebar navigation and disabled future modules", async () => {
+  it("renders sidebar navigation and disabled approval-gated modules", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
     expect(await screen.findByRole("button", { name: /^Dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Company Profile/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Publisher Profile/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Company Profile/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Account Information/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Repertoire/i })).toHaveAttribute("data-disabled", "true");
-    expect(screen.getByRole("button", { name: /^Licensee Exclusions/i })).toHaveAttribute("data-disabled", "true");
-    expect(screen.getByRole("button", { name: /^Reporting/i })).toHaveAttribute("data-disabled", "true");
+    expect(screen.getByRole("button", { name: /^Repertoire/i })).toHaveAttribute(
+      "data-disabled",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: /^Licensee Exclusions/i })).toHaveAttribute(
+      "data-disabled",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: /^Reporting/i })).toHaveAttribute(
+      "data-disabled",
+      "true"
+    );
+    expect(screen.queryByText("Requires approval")).not.toBeInTheDocument();
   });
 
-  it("lets a user navigate from Dashboard to Company Profile and Account Information", async () => {
+  it("lets a user navigate from Dashboard to Publisher Profile and Account Information", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Company Profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Publisher Profile/i }));
 
     expect(await screen.findByDisplayValue("Example Media Inc.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Account Information/i }));
 
-    expect(await screen.findByText("Company role")).toBeInTheDocument();
+    expect(await screen.findByText("Publisher role")).toBeInTheDocument();
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
-  it("shows company summary and static future status cards for an existing company", async () => {
+  it("shows company summary and approval-gated status cards for an existing company", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    expect(await screen.findByText("Company summary")).toBeInTheDocument();
+    expect(await screen.findByText("Publisher summary")).toBeInTheDocument();
     expect(screen.getByText("Example Media Inc.")).toBeInTheDocument();
-    expect(screen.getAllByText("Repertoire").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Coming soon").length).toBeGreaterThan(0);
-    expect(screen.getByText("Next steps coming soon")).toBeInTheDocument();
+    expect(screen.getByText("Publisher verification: Pending review")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending review").length).toBeGreaterThan(0);
+    expect(screen.getByText("Define your licensable content repertoire")).toBeInTheDocument();
+    expect(screen.getByText("Manage licensee exclusions")).toBeInTheDocument();
+    expect(screen.getByText("Review reporting activity")).toBeInTheDocument();
+    expect(screen.getByText("Prepare enrollment readiness")).toBeInTheDocument();
+    expect(screen.getByText("Set up licensing payments")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending approval").length).toBeGreaterThan(0);
   });
 
-  it("does not make future-module API calls for static dashboard cards", async () => {
+  it("does not use coming-soon language for verification-locked capabilities", async () => {
+    mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    await screen.findByText("Publisher summary");
+
+    expect(document.body.textContent ?? "").not.toMatch(/coming soon/i);
+    expect(document.body.textContent ?? "").not.toContain(
+      "Future modules are visible for orientation only. They are not configured yet."
+    );
+  });
+
+  it("does not navigate when disabled approval-gated modules are clicked", async () => {
+    mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    await screen.findByRole("heading", { name: "Dashboard" });
+    const repertoireButton = screen.getByRole("button", { name: /^Repertoire/i });
+    fireEvent.click(repertoireButton);
+
+    expect(window.location.pathname).toBe("/dashboard");
+  });
+
+  it("does not make verification, payment, or gated-module API calls for static dashboard cards", async () => {
     const fetchMock = mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    await screen.findByText("Company summary");
+    await screen.findByText("Publisher summary");
     const calledPaths = fetchMock.mock.calls.map(([path]) => path);
 
     expect(calledPaths).toEqual(expect.arrayContaining(["/api/session", "/api/company"]));
+    expect(calledPaths).not.toContain("/api/verification");
     expect(calledPaths).not.toContain("/api/repertoire");
     expect(calledPaths).not.toContain("/api/reporting");
     expect(calledPaths).not.toContain("/api/licensee-exclusions");
+    expect(calledPaths).not.toContain("/api/enrollment");
+    expect(calledPaths).not.toContain("/api/payments");
   });
 });

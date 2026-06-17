@@ -38,7 +38,7 @@ function renderWithProviders(ui: ReactElement) {
 
 function fillValidProfile(overrides: Record<string, string> = {}) {
   const values = {
-    "Legal company name": "Example Media Inc.",
+    "Legal publisher name": "Example Media Inc.",
     "Primary contact name": "Jane Publisher",
     "Primary contact email": "jane@example.com",
     Country: "us",
@@ -80,7 +80,7 @@ describe("CompanyProfileForm", () => {
 
     renderWithProviders(<CompanyProfileTab authenticated />);
 
-    expect(await screen.findByText(/no company profile has been created yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no publisher profile has been created yet/i)).toBeInTheDocument();
   });
 
   it("shows an editable form for a no-company user", async () => {
@@ -88,8 +88,9 @@ describe("CompanyProfileForm", () => {
 
     renderWithProviders(<CompanyProfileTab authenticated />);
 
-    expect(await screen.findByLabelText(/^Legal company name/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save company profile/i })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Legal publisher name/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save publisher profile/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Publisher Profile" })).toBeInTheDocument();
   });
 
   it("loads existing company data into the form", async () => {
@@ -100,14 +101,16 @@ describe("CompanyProfileForm", () => {
     expect(await screen.findByDisplayValue("Example Media Inc.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jane Publisher")).toBeInTheDocument();
     expect(screen.getByDisplayValue("US")).toBeInTheDocument();
+    expect(screen.queryByText("Billing contact")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Billing contact email/i)).not.toBeInTheDocument();
   });
 
   it("renders required field errors", async () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
-    expect(await screen.findByText("Legal company name is required.")).toBeInTheDocument();
+    expect(await screen.findByText("Legal publisher name is required.")).toBeInTheDocument();
     expect(screen.getByText("Primary contact name is required.")).toBeInTheDocument();
   });
 
@@ -115,7 +118,7 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
     fillValidProfile({ "Primary contact email": "not-an-email" });
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     expect(await screen.findByText(/invalid email/i)).toBeInTheDocument();
   });
@@ -123,27 +126,26 @@ describe("CompanyProfileForm", () => {
   it("uses the allowed company type options", async () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
 
-    fireEvent.click(getInputByLabel(/^Company type/i));
+    fireEvent.click(getInputByLabel(/^Publisher type/i));
 
     for (const companyType of companyTypeValues) {
       expect(await screen.findByText(companyType)).toBeInTheDocument();
     }
   });
 
-  it("submits only allowed company profile fields", async () => {
+  it("submits only allowed company profile fields to /api/company", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 201));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<CompanyProfileForm company={null} />);
     fillValidProfile();
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/company", expect.any(Object)));
     expect(Object.keys(readLastJsonBody(fetchMock)).sort()).toEqual(
       [
         "addressLine1",
         "addressLine2",
-        "billingContactEmail",
         "city",
         "companyType",
         "country",
@@ -156,6 +158,7 @@ describe("CompanyProfileForm", () => {
         "region"
       ].sort()
     );
+    expect(readLastJsonBody(fetchMock)).not.toHaveProperty("billingContactEmail");
   });
 
   it("does not include companyId or company_id in submit payloads", async () => {
@@ -164,7 +167,7 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
     fillValidProfile();
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = readLastJsonBody(fetchMock);
@@ -193,10 +196,10 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
     fillValidProfile();
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     expect(await screen.findByText("Use a company email address.")).toBeInTheDocument();
-    expect(screen.getByText("Invalid company profile.")).toBeInTheDocument();
+    expect(screen.getByText("Invalid publisher profile.")).toBeInTheDocument();
   });
 
   it("preserves user input when server validation fails", async () => {
@@ -218,9 +221,9 @@ describe("CompanyProfileForm", () => {
       )
     );
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile({ "Legal company name": "Draft Publisher" });
+    fillValidProfile({ "Legal publisher name": "Draft Publisher" });
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     expect(await screen.findByText("Legal name is already in use.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Draft Publisher")).toBeInTheDocument();
@@ -231,10 +234,10 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
     fillValidProfile();
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /save company profile/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /save publisher profile/i })).toBeDisabled();
     });
   });
 
@@ -242,12 +245,12 @@ describe("CompanyProfileForm", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 200)));
     renderWithProviders(<CompanyProfileForm company={existingCompany} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /save company profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save publisher profile/i }));
 
-    expect(await screen.findByText("Your company profile has been saved.")).toBeInTheDocument();
+    expect(await screen.findByText("Your publisher profile has been saved.")).toBeInTheDocument();
   });
 
-  it("opens the Dashboard home first and then navigates to Company Profile for a user with no company", async () => {
+  it("opens the Dashboard home first and then navigates to Publisher Profile for a user with no company", async () => {
     const fetchMock = vi.fn((path: string) => {
       if (path === "/api/session") {
         return Promise.resolve(
@@ -274,11 +277,11 @@ describe("CompanyProfileForm", () => {
 
     renderWithProviders(<DashboardPage />);
 
-    expect(await screen.findByText("Create your company profile")).toBeInTheDocument();
+    expect(await screen.findByText("Create your publisher profile")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Company Profile/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Publisher Profile/i }));
 
-    expect(await screen.findByText(/no company profile has been created yet/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Legal company name/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no publisher profile has been created yet/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Legal publisher name/i)).toBeInTheDocument();
   });
 });

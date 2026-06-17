@@ -17,28 +17,28 @@ export function CompanyProfileTab({ authenticated }: CompanyProfileTabProps) {
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Company Profile"
-        description="Create or edit the publisher company details used for the phase-one RSL Collective profile application."
+        title="Publisher Profile"
+        description="Create or edit the publisher details used for the phase-one RSL Collective profile application."
       />
       {companyQuery.isLoading || companyQuery.isFetching ? (
         <Stack gap="sm">
           <Text c="dimmed" size="sm">
-            Loading company profile...
+            Loading publisher profile...
           </Text>
           <LoadingState rows={6} />
         </Stack>
       ) : companyQuery.isError ? (
         <ErrorState
-          title="Company profile unavailable"
-          description="Company profile details could not be loaded."
+          title="Publisher profile unavailable"
+          description="Publisher profile details could not be loaded."
         />
       ) : company ? (
         <CompanyProfileForm company={company} />
       ) : (
         <Stack gap="md">
           <EmptyState
-            title="No company profile"
-            description="No company profile has been created yet. Add the basic company details to create your profile."
+            title="No publisher profile"
+            description="No publisher profile has been created yet. Add the basic publisher details to create your profile."
             action={
               <Button variant="light" size="xs" disabled>
                 Profile form ready below
@@ -46,7 +46,7 @@ export function CompanyProfileTab({ authenticated }: CompanyProfileTabProps) {
             }
           />
           <Text c="dimmed" size="sm">
-            Fields are limited to the phase-one company profile scope.
+            Fields are limited to the phase-one publisher profile scope.
           </Text>
           <CompanyProfileForm company={null} />
         </Stack>
