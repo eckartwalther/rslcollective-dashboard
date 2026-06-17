@@ -8,6 +8,7 @@ import {
   Stack,
   Text,
   Tooltip,
+  UnstyledButton,
   useMantineTheme
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
@@ -98,13 +99,18 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="md" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Image
-              src="/brand/rsl-internet-collective-logo.svg"
-              alt="RSL Internet Collective"
-              h={32}
-              w="auto"
-              fit="contain"
-            />
+            <UnstyledButton
+              aria-label="RSL Internet Collective dashboard"
+              onClick={() => navigateToView("dashboard")}
+            >
+              <Image
+                src="/brand/rsl-internet-collective-logo.svg"
+                alt="RSL Internet Collective"
+                h={32}
+                w="auto"
+                fit="contain"
+              />
+            </UnstyledButton>
           </Group>
 
           <Group gap="sm" wrap="nowrap">

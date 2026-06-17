@@ -194,6 +194,11 @@ describe("dashboard behavior", () => {
 
     expect(await screen.findByText("Publisher role")).toBeInTheDocument();
     expect(screen.getByText("owner")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "RSL Internet Collective dashboard" }));
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/dashboard");
   });
 
   it("shows company summary and approval-gated status cards for an existing company", async () => {

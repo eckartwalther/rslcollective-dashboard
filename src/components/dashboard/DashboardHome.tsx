@@ -34,54 +34,54 @@ type DashboardHomeProps = {
 };
 
 const dashboardCopy = {
-  headerDescription:
-    "Manage the publisher profile that identifies your organization for RSL Collective participation. RSL Collective review and approval unlock the additional repertoire, exclusion, reporting, enrollment, and payment capabilities in this workflow.",
-  noCompanyNextStep:
-    "Create your publisher profile so the RSL Collective can verify your publisher account.",
-  noCompanyVerification:
-    "Verification begins after the profile is complete. Additional capabilities remain locked until publisher approval.",
-  companyReview:
-    "Your publisher profile is saved. The RSL Collective will review and approve the publisher before enabling additional capabilities.",
-  companyProfile: {
-    title: "Publisher profile",
-    complete: "Basic publisher identity and contact details are saved.",
-    notStarted: "Create the publisher profile to begin publisher verification."
+  header: {
+    title: "License your content and receive royalties through the RSL Collective",
+    badge: "Beta",
+    description: "Create your publisher profile to begin verification."
   },
-  verification: {
-    title: "Publisher verification",
-    pendingReview:
-      "Complete and verify your RSL Collective publisher profile.",
-    waitingForProfile: "Complete and verify your RSL Collective publisher profile."
+  gettingStarted: {
+    sectionTitle: "Getting started",
+    noProfileHeading: "Create your publisher profile",
+    noProfileDescription: "Submit your publisher information for RSL Collective verification.",
+    noProfileAction: "Create publisher profile",
+    submittedHeading: "Publisher profile submitted",
+    submittedDescription: "Your publisher profile is under review.",
+    submittedAction: "Edit publisher profile"
   },
-  capabilities: [
+  cards: {
+    publisherProfile: {
+      title: "Create and verify your publisher profile",
+      description: "Submit publisher identity, contact, and business information."
+    },
+    verification: {
+      title: "Complete publisher verification",
+      description: "Verify your publisher account for RSL Collective participation."
+    }
+  },
+  modules: [
     {
       title: "Define your licensable content repertoire",
-      approvedDescription: "Repertoire setup is available after publisher approval and onboarding.",
-      waitingDescription: "Repertoire setup is locked until publisher verification can begin.",
+      description: "Identify the content included in RSL Collective licensing.",
       icon: Library
     },
     {
       title: "Manage licensee exclusions",
-      approvedDescription: "Licensee exclusion controls are available after RSL Collective approval.",
-      waitingDescription: "Licensee exclusion controls are locked until publisher verification can begin.",
+      description: "Exclude specific licensees or licensee categories.",
       icon: Ban
     },
     {
-      title: "Review reporting activity",
-      approvedDescription: "Reporting access is available after approval and onboarding.",
-      waitingDescription: "Reporting access is locked until publisher verification can begin.",
+      title: "View licensing and settlement reports",
+      description: "Review usage, licensing, settlement, and royalty reports.",
       icon: BarChart3
     },
     {
-      title: "Prepare enrollment readiness",
-      approvedDescription: "Enrollment readiness depends on RSL Collective approval of this publisher.",
-      waitingDescription: "Complete the publisher profile to begin publisher verification.",
+      title: "Manage publisher enrollment",
+      description: "Activate publisher participation in RSL Collective licensing.",
       icon: ClipboardCheck
     },
     {
-      title: "Set up licensing payments",
-      approvedDescription: "Payment setup is available after publisher approval and onboarding.",
-      waitingDescription: "Payment setup is locked until publisher verification can begin.",
+      title: "Set up royalty payments",
+      description: "Configure payment details for royalty distributions.",
       icon: CreditCard
     }
   ]
@@ -95,17 +95,15 @@ export function DashboardHome({
   onNavigateToCompany
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
-  const verificationStatus = hasCompany ? "Pending review" : "Waiting for publisher profile";
-  const capabilityStatus = hasCompany ? "Pending approval" : "Pending verification";
 
   return (
     <Stack gap="lg">
       <PageHeader
-        title="Dashboard"
-        description={dashboardCopy.headerDescription}
+        title={dashboardCopy.header.title}
+        description={dashboardCopy.header.description}
         badge={
           <Badge color="blue" variant="light">
-            Beta
+            {dashboardCopy.header.badge}
           </Badge>
         }
       />
@@ -127,19 +125,19 @@ export function DashboardHome({
                 <Building2 size={22} strokeWidth={1.8} />
               </ThemeIcon>
               <Stack gap="xs" maw={680}>
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  {dashboardCopy.gettingStarted.sectionTitle}
+                </Text>
                 <Title order={2} size="h4">
-                  Create your publisher profile
+                  {dashboardCopy.gettingStarted.noProfileHeading}
                 </Title>
                 <Text size="sm" c="dimmed">
-                  {dashboardCopy.noCompanyNextStep}
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {dashboardCopy.noCompanyVerification}
+                  {dashboardCopy.gettingStarted.noProfileDescription}
                 </Text>
               </Stack>
             </Group>
             <Button leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-              Create publisher profile
+              {dashboardCopy.gettingStarted.noProfileAction}
             </Button>
           </Group>
         </Card>
@@ -150,23 +148,23 @@ export function DashboardHome({
           <Stack gap="md">
             <Group justify="space-between" align="flex-start" gap="md">
               <Stack gap={4}>
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  {dashboardCopy.gettingStarted.sectionTitle}
+                </Text>
                 <Group gap="xs">
                   <Title order={2} size="h4">
-                    Publisher summary
+                    {dashboardCopy.gettingStarted.submittedHeading}
                   </Title>
                   <Badge color="green" variant="light">
                     Complete
                   </Badge>
                 </Group>
                 <Text size="sm" c="dimmed">
-                  {dashboardCopy.companyReview}
+                  {dashboardCopy.gettingStarted.submittedDescription}
                 </Text>
-                <Badge color="yellow" variant="light" w="fit-content">
-                  Publisher verification: Pending review
-                </Badge>
               </Stack>
               <Button variant="default" leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-                Edit publisher profile
+                {dashboardCopy.gettingStarted.submittedAction}
               </Button>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
@@ -183,13 +181,9 @@ export function DashboardHome({
 
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <StatusCard
-          title={dashboardCopy.companyProfile.title}
+          title={dashboardCopy.cards.publisherProfile.title}
           status={hasCompany ? "Complete" : "Not started"}
-          description={
-            hasCompany
-              ? dashboardCopy.companyProfile.complete
-              : dashboardCopy.companyProfile.notStarted
-          }
+          description={dashboardCopy.cards.publisherProfile.description}
           icon={Building2}
           color={hasCompany ? "green" : "yellow"}
           action={
@@ -199,25 +193,19 @@ export function DashboardHome({
           }
         />
         <StatusCard
-          title={dashboardCopy.verification.title}
-          status={verificationStatus}
-          description={
-            hasCompany
-              ? dashboardCopy.verification.pendingReview
-              : dashboardCopy.verification.waitingForProfile
-          }
+          title={dashboardCopy.cards.verification.title}
+          status={hasCompany ? "Pending verification" : "Pending profile"}
+          description={dashboardCopy.cards.verification.description}
           icon={ShieldCheck}
           color={hasCompany ? "yellow" : "orange"}
         />
-        {dashboardCopy.capabilities.map((capability) => (
+        {dashboardCopy.modules.map((module) => (
           <StatusCard
-            key={capability.title}
-            title={capability.title}
-            status={capabilityStatus}
-            description={
-              hasCompany ? capability.approvedDescription : capability.waitingDescription
-            }
-            icon={capability.icon}
+            key={module.title}
+            title={module.title}
+            status="Pending verification"
+            description={module.description}
+            icon={module.icon}
             color="gray"
           />
         ))}
