@@ -39,3 +39,5 @@ Production deploy uses `wrangler.production.jsonc`, which contains the `dashboar
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for Cloudflare account targeting, D1 setup, Worker secrets, WorkOS/AuthKit configuration, and the production smoke test.
+
+Use [docs/production-checklist.md](docs/production-checklist.md) for the final production setup sequence before running remote migrations or deploying.

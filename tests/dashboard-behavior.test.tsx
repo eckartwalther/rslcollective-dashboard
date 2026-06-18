@@ -152,9 +152,11 @@ describe("dashboard behavior", () => {
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByText("License your content and receive royalties through the RSL Collective.")).toBeInTheDocument();
-    expect(await screen.findByText("Create publisher profile")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Define publisher profile" })
+    ).toBeInTheDocument();
     expect(screen.getByText("Submit your publisher information for RSL Collective verification.")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Create publisher profile" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Define publisher profile" })).toHaveLength(1);
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 

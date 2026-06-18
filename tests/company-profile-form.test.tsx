@@ -338,7 +338,9 @@ describe("CompanyProfileForm", () => {
 
     renderWithProviders(<DashboardPage />);
 
-    expect(await screen.findByText("Create publisher profile")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Define publisher profile" })
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Publisher Profile/i }));
 

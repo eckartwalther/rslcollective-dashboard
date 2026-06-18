@@ -230,7 +230,8 @@ WorkOS production requirements:
 - Email domain for `no-reply@mail.rslcollective.org` is configured and verified.
 - Callback URL is configured as `https://dashboard.rslcollective.org/auth/callback`.
 - Sign-in endpoint is configured as `https://dashboard.rslcollective.org/login`.
-- Sign-out redirect is configured as `https://dashboard.rslcollective.org/`.
+- Sign-out/logout return URL is configured as `https://dashboard.rslcollective.org/login`.
+- WorkOS Organizations are not used in this phase.
 
 Current logout behavior:
 
@@ -267,7 +268,7 @@ Current logout behavior:
 - Worker secrets and production runtime variables are set.
 - WorkOS callback URL is set.
 - WorkOS sign-in endpoint is set.
-- WorkOS sign-out redirect is set.
+- WorkOS sign-out/logout return URL is set to `/login`.
 - AuthKit custom domain is DNS-only in Cloudflare.
 - Email domain is verified.
 - `dashboard.rslcollective.org` route is active.
