@@ -9,6 +9,7 @@ import {
 import { addDaysIso } from "./time";
 
 export const SESSION_COOKIE_NAME = "__Host-rsl_dashboard_session";
+export const DEVELOPMENT_SESSION_COOKIE_NAME = "rsl_dashboard_session";
 export const SESSION_DURATION_DAYS = 30;
 export const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -51,6 +52,11 @@ export type CreateLocalSessionResult = {
   expiresAt: string;
   cookie: string;
   session: SessionRow | null;
+};
+
+export type DeleteSessionResult = {
+  session: SessionRow | null;
+  cookies: string[];
 };
 
 export type SessionValidationResult =
@@ -186,55 +192,76 @@ export function normalizeReturnTo(returnTo: string) {
 
 export function createSessionCookie(
   token: string,
-  options: { expiresAt: string; secure?: boolean }
+  options: { expiresAt: string; env: SessionEnv }
 ) {
+  const production = isProductionSessionEnv(options.env);
   const cookie = [
-    `${SESSION_COOKIE_NAME}=${token}`,
+    `${sessionCookieNameForEnv(options.env)}=${token}`,
     "HttpOnly",
     "SameSite=Lax",
     "Path=/",
-    "Secure",
     `Expires=${new Date(options.expiresAt).toUTCString()}`
   ];
+
+  if (production) {
+    cookie.splice(4, 0, "Secure");
+  }
 
   return cookie.join("; ");
 }
 
-export function createClearSessionCookie(_options: { secure?: boolean } = {}) {
+export function createClearSessionCookie(env: SessionEnv = { ENVIRONMENT: "production" }) {
+  const production = isProductionSessionEnv(env);
   const cookie = [
-    `${SESSION_COOKIE_NAME}=`,
+    `${sessionCookieNameForEnv(env)}=`,
     "HttpOnly",
     "SameSite=Lax",
     "Path=/",
-    "Secure",
     "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
     "Max-Age=0"
   ];
 
+  if (production) {
+    cookie.splice(4, 0, "Secure");
+  }
+
   return cookie.join("; ");
 }
 
-export function getSessionTokenFromCookie(cookieHeader: string | null) {
+export function createClearSessionCookies(env: SessionEnv) {
+  if (isProductionSessionEnv(env)) {
+    return [createClearSessionCookie(env)];
+  }
+
+  return [
+    createClearSessionCookie(env),
+    createClearSessionCookie({ ENVIRONMENT: "production" })
+  ];
+}
+
+export function getSessionTokenFromCookie(cookieHeader: string | null, env: SessionEnv) {
   if (!cookieHeader) {
     return null;
   }
 
-  const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
-  const sessionCookie = cookies.find((cookie) =>
-    cookie.startsWith(`${SESSION_COOKIE_NAME}=`)
-  );
+  const cookies = parseCookieHeader(cookieHeader);
 
-  if (!sessionCookie) {
-    return null;
+  for (const cookieName of sessionCookieNamesForEnv(env)) {
+    const token = cookies.get(cookieName);
+
+    if (token) {
+      return token;
+    }
   }
 
-  return sessionCookie.slice(SESSION_COOKIE_NAME.length + 1) || null;
+  return null;
 }
 
 export async function createLocalSession(
   store: SessionStore,
   userId: string,
   env: SessionEnv,
+  workosSessionId: string | null,
   now = new Date()
 ): Promise<CreateLocalSessionResult> {
   const token = createSessionToken();
@@ -243,11 +270,12 @@ export async function createLocalSession(
   const session = await store.createSession({
     userId,
     tokenHash,
+    workosSessionId,
     expiresAt
   });
   const cookie = createSessionCookie(token, {
     expiresAt,
-    secure: isProductionSessionEnv(env)
+    env
   });
 
   return {
@@ -265,7 +293,7 @@ export async function validateSessionFromRequest(
   env: SessionEnv,
   now = new Date()
 ): Promise<SessionValidationResult> {
-  const token = getSessionTokenFromCookie(request.headers.get("Cookie"));
+  const token = getSessionTokenFromCookie(request.headers.get("Cookie"), env);
 
   if (!token) {
     return { authenticated: false, reason: "missing" };
@@ -290,7 +318,7 @@ export async function validateSessionFromRequest(
     };
   const cookie = createSessionCookie(token, {
     expiresAt: refreshedExpiresAt,
-    secure: isProductionSessionEnv(env)
+    env
   });
 
   return {
@@ -305,19 +333,47 @@ export async function deleteSessionFromRequest(
   store: SessionStore,
   request: Request,
   env: SessionEnv
-) {
-  const token = getSessionTokenFromCookie(request.headers.get("Cookie"));
+): Promise<DeleteSessionResult> {
+  const token = getSessionTokenFromCookie(request.headers.get("Cookie"), env);
+  let session: SessionRow | null = null;
 
   if (token) {
     const tokenHash = await hashSessionToken(token);
-    const session = await store.getSessionByTokenHash(tokenHash);
+    session = await store.getSessionByTokenHash(tokenHash);
 
     if (session) {
       await store.deleteSession(session.id);
     }
   }
 
-  return createClearSessionCookie({ secure: isProductionSessionEnv(env) });
+  return {
+    session,
+    cookies: createClearSessionCookies(env)
+  };
+}
+
+export function sessionCookieNameForEnv(env: SessionEnv) {
+  return isProductionSessionEnv(env) ? SESSION_COOKIE_NAME : DEVELOPMENT_SESSION_COOKIE_NAME;
+}
+
+function sessionCookieNamesForEnv(env: SessionEnv) {
+  return isProductionSessionEnv(env)
+    ? [SESSION_COOKIE_NAME]
+    : [DEVELOPMENT_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME];
+}
+
+function parseCookieHeader(cookieHeader: string) {
+  const cookies = new Map<string, string>();
+
+  for (const cookie of cookieHeader.split(";")) {
+    const [name, ...valueParts] = cookie.trim().split("=");
+
+    if (name && valueParts.length > 0) {
+      cookies.set(name, valueParts.join("="));
+    }
+  }
+
+  return cookies;
 }
 
 export function base64UrlEncode(bytes: Uint8Array) {

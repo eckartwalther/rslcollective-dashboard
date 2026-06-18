@@ -1,9 +1,19 @@
 import { createSessionRoutes, type SessionRouteDeps } from "../worker/routes/session";
-import { SESSION_COOKIE_NAME, hashSessionToken, type SessionStore } from "../worker/lib/session";
+import {
+  DEVELOPMENT_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  hashSessionToken,
+  type SessionStore
+} from "../worker/lib/session";
 import type { SessionData, SessionRow, UserRow } from "../worker/lib/db";
 
 const env = {
   ENVIRONMENT: "production",
+  DB: {} as D1Database
+};
+
+const developmentEnv = {
+  ENVIRONMENT: "development",
   DB: {} as D1Database
 };
 
@@ -13,6 +23,7 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
+    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -93,6 +104,45 @@ describe("GET /api/session", () => {
         hasCompany: true
       }
     });
+  });
+
+  it("returns authenticated user shape for a valid development session cookie", async () => {
+    const token = "valid-development-session-token";
+    const tokenHash = await hashSessionToken(token);
+    const route = createHarness({
+      session: createSessionRow({ token_hash: tokenHash }),
+      user: createUser()
+    });
+    const response = await route.request(
+      "/",
+      { headers: { Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}` } },
+      developmentEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toMatchObject({
+      authenticated: true,
+      user: {
+        email: "jane@example.com"
+      }
+    });
+  });
+
+  it("does not authenticate a development cookie in production", async () => {
+    const token = "dev-cookie-only-token";
+    const tokenHash = await hashSessionToken(token);
+    const route = createHarness({
+      session: createSessionRow({ token_hash: tokenHash }),
+      user: createUser()
+    });
+    const response = await route.request(
+      "/",
+      { headers: { Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}` } },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({ authenticated: false });
   });
 
   it("does not authenticate expired sessions", async () => {

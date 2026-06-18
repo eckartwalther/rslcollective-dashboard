@@ -1,3 +1,5 @@
+import { browserRuntimeSnapshot, isFrontendRuntimeDiagnosticsEnabled } from "./runtimeDiagnostics";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -63,7 +65,7 @@ function apiErrorMessage(body: unknown, response: Response) {
 }
 
 function logFrontendApiRequest(path: string, init: RequestInit) {
-  if (!isFrontendApiDiagnosticsEnabled()) {
+  if (!isFrontendRuntimeDiagnosticsEnabled()) {
     return;
   }
 
@@ -71,24 +73,6 @@ function logFrontendApiRequest(path: string, init: RequestInit) {
     event: "frontend_api_request",
     method: init.method ?? "GET",
     url: path,
-    locationHref: window.location.href,
-    locationOrigin: window.location.origin,
-    locationHost: window.location.host
+    ...browserRuntimeSnapshot()
   });
-}
-
-function isFrontendApiDiagnosticsEnabled() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  if (import.meta.env.MODE === "test") {
-    return false;
-  }
-
-  return import.meta.env.DEV || isLocalBrowserHost(window.location.hostname);
-}
-
-function isLocalBrowserHost(hostname: string) {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }

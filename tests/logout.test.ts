@@ -1,5 +1,10 @@
 import { createAuthRoutes, type AuthRouteDeps } from "../worker/routes/auth";
-import { SESSION_COOKIE_NAME, hashSessionToken, type SessionStore } from "../worker/lib/session";
+import {
+  DEVELOPMENT_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  hashSessionToken,
+  type SessionStore
+} from "../worker/lib/session";
 import type { SessionData, SessionRow, UserRow, WorkosUserData } from "../worker/lib/db";
 import type { WorkosAuthEnv, WorkosAuthenticatedUser } from "../worker/lib/workos";
 
@@ -17,6 +22,7 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
+    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -30,7 +36,8 @@ function createHarness(options: {
 } = {}) {
   let session = options.session ?? null;
   const calls = {
-    deletedSessionId: null as string | null
+    deletedSessionId: null as string | null,
+    logoutSessionId: null as string | null
   };
   const sessionStore: SessionStore = {
     createSession: async (_session: SessionData) => null,
@@ -52,7 +59,10 @@ function createHarness(options: {
       null,
     updateUserFromWorkos: async (_db: D1Database, _user: WorkosUserData): Promise<UserRow | null> =>
       null,
-    getLogoutUrl: () => options.logoutUrl ?? null
+    getLogoutUrl: (_env, sessionId) => {
+      calls.logoutSessionId = sessionId ?? null;
+      return options.logoutUrl ?? null;
+    }
   };
 
   return {
@@ -113,7 +123,7 @@ describe("POST /logout", () => {
     expect(response.headers.get("Location")).toBe("/login");
   });
 
-  it("clears the __Host- cookie with Secure in development", async () => {
+  it("clears the development cookie without Secure in development", async () => {
     const { routes } = createHarness();
     const response = await logoutRequest(routes, {
       env: { ENVIRONMENT: "development", DB: {} as D1Database },
@@ -121,13 +131,24 @@ describe("POST /logout", () => {
     });
     const cookie = response.headers.get("Set-Cookie");
 
-    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
     expect(cookie).toContain("HttpOnly");
-    expect(cookie).toContain("Secure");
     expect(cookie).toContain("SameSite=Lax");
     expect(cookie).toContain("Path=/");
     expect(cookie).toContain("Max-Age=0");
     expect(cookie).not.toContain("Domain=");
+  });
+
+  it("also clears a stale production cookie in development", async () => {
+    const { routes } = createHarness();
+    const response = await logoutRequest(routes, {
+      env: { ENVIRONMENT: "development", DB: {} as D1Database },
+      headers: { Origin: "http://localhost:8787" }
+    });
+    const cookie = response.headers.get("Set-Cookie");
+
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
   });
 
   it("invalidates the local D1 session when a session cookie is present", async () => {
@@ -183,6 +204,25 @@ describe("POST /logout", () => {
     expect(cookie).not.toContain("Domain=");
   });
 
+  it("invalidates the local D1 session from a development cookie when present", async () => {
+    const token = "dev-logout-token";
+    const tokenHash = await hashSessionToken(token);
+    const { routes, calls } = createHarness({
+      session: createSessionRow({ token_hash: tokenHash }),
+      logoutUrl: null
+    });
+    const response = await logoutRequest(routes, {
+      env: { ENVIRONMENT: "development", DB: {} as D1Database },
+      headers: {
+        Origin: "http://localhost:8787",
+        Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}`
+      }
+    });
+
+    expect(response.status).toBe(302);
+    expect(calls.deletedSessionId).toBe("ses_logout");
+  });
+
   it("redirects through WorkOS logout URL when available", async () => {
     const logoutUrl = "https://api.workos.com/user_management/logout?client_id=client_test";
     const { routes } = createHarness({ logoutUrl });
@@ -194,7 +234,52 @@ describe("POST /logout", () => {
     expect(response.headers.get("Location")).toBe(logoutUrl);
   });
 
-  it("falls back to /login in local development when WorkOS logout URL is unavailable", async () => {
+  it("falls back to /login when no WorkOS session ID is stored", async () => {
+    const token = "legacy-logout-token";
+    const tokenHash = await hashSessionToken(token);
+    const { routes, calls } = createHarness({
+      session: createSessionRow({ token_hash: tokenHash, workos_session_id: null }),
+      logoutUrl: null
+    });
+    const response = await logoutRequest(routes, {
+      headers: {
+        Origin: "https://dashboard.rslcollective.org",
+        Cookie: `${SESSION_COOKIE_NAME}=${token}`
+      }
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/login");
+    expect(calls.logoutSessionId).toBeNull();
+    expect(calls.deletedSessionId).toBe("ses_logout");
+  });
+
+  it("uses the stored WorkOS session ID when building the logout URL", async () => {
+    const token = "logout-token";
+    const tokenHash = await hashSessionToken(token);
+    const logoutUrl =
+      "https://api.workos.com/user_management/sessions/logout?session_id=workos_session_test&return_to=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin";
+    const { routes, calls } = createHarness({
+      session: createSessionRow({
+        token_hash: tokenHash,
+        workos_session_id: "workos_session_test"
+      }),
+      logoutUrl
+    });
+    const response = await logoutRequest(routes, {
+      headers: {
+        Origin: "https://dashboard.rslcollective.org",
+        Cookie: `${SESSION_COOKIE_NAME}=${token}`
+      }
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(logoutUrl);
+    expect(calls.logoutSessionId).toBe("workos_session_test");
+    expect(calls.deletedSessionId).toBe("ses_logout");
+  });
+
+  it("falls back to /login when WorkOS logout URL is unavailable", async () => {
     const { routes } = createHarness({ logoutUrl: null });
     const response = await logoutRequest(routes, {
       env: { ENVIRONMENT: "development", DB: {} as D1Database },

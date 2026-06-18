@@ -8,10 +8,10 @@
     "build": "tsc -p tsconfig.json && vite build",
     "test": "vitest",
     "check": "tsc --noEmit",
-    "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 migrations apply rsl-collective-dashboard --local",
-    "db:migrate:remote": "wrangler d1 migrations apply rsl-collective-dashboard --remote"
+    "worker:dev": "wrangler dev --config wrangler.jsonc",
+    "worker:deploy": "wrangler deploy --config wrangler.production.jsonc",
+    "db:migrate:local": "wrangler d1 migrations apply rsl-collective-dashboard --local --config wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply rsl-collective-dashboard --remote --config wrangler.production.jsonc"
   },
   "dependencies": {
     "@mantine/core": "^8.0.0",

@@ -46,6 +46,7 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
+    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",

@@ -1,5 +1,6 @@
 const workosMock = vi.hoisted(() => ({
   authenticateWithCode: vi.fn(),
+  getLogoutUrl: vi.fn(),
   WorkOS: vi.fn()
 }));
 
@@ -10,6 +11,7 @@ vi.mock("@workos-inc/node/worker", () => ({
 import {
   exchangeWorkosAuthorizationCode,
   getWorkosAuthorizationUrl,
+  getWorkosLogoutUrl,
   getWorkosRedirectUri
 } from "../worker/lib/workos";
 
@@ -23,12 +25,17 @@ const env = {
 describe("WorkOS helper", () => {
   beforeEach(() => {
     workosMock.authenticateWithCode.mockReset();
+    workosMock.getLogoutUrl.mockReset();
     workosMock.WorkOS.mockReset();
     workosMock.WorkOS.mockImplementation(() => ({
       userManagement: {
-        authenticateWithCode: workosMock.authenticateWithCode
+        authenticateWithCode: workosMock.authenticateWithCode,
+        getLogoutUrl: workosMock.getLogoutUrl
       }
     }));
+    workosMock.getLogoutUrl.mockReturnValue(
+      "https://api.workos.com/user_management/sessions/logout?session_id=workos_session_test&return_to=http%3A%2F%2Flocalhost%3A8787%2Flogin"
+    );
   });
 
   afterEach(() => {
@@ -45,7 +52,8 @@ describe("WorkOS helper", () => {
         emailVerified: true
       },
       accessToken: "ignored_access_token",
-      refreshToken: "ignored_refresh_token"
+      refreshToken: "ignored_refresh_token",
+      sessionId: "workos_session_test"
     });
 
     const user = await exchangeWorkosAuthorizationCode(
@@ -63,8 +71,30 @@ describe("WorkOS helper", () => {
       email: "publisher@example.com",
       firstName: "Jane",
       lastName: "Publisher",
-      emailVerified: true
+      emailVerified: true,
+      sessionId: "workos_session_test"
     });
+  });
+
+  it("does not store or expose WorkOS access or refresh tokens in mapped auth data", async () => {
+    workosMock.authenticateWithCode.mockResolvedValue({
+      user: {
+        id: "user_workos",
+        email: "publisher@example.com"
+      },
+      accessToken: "ignored_access_token",
+      refreshToken: "ignored_refresh_token",
+      sessionId: "workos_session_test"
+    });
+
+    const user = await exchangeWorkosAuthorizationCode(
+      { ...env, ENVIRONMENT: "production" },
+      "code_valid"
+    );
+
+    expect(user).not.toHaveProperty("accessToken");
+    expect(user).not.toHaveProperty("refreshToken");
+    expect(user.sessionId).toBe("workos_session_test");
   });
 
   it("logs redacted exchange failure details outside production", async () => {
@@ -165,5 +195,44 @@ describe("WorkOS helper", () => {
     expect(getWorkosRedirectUri({ ...env, ENVIRONMENT: "production" })).toBe(
       "https://dashboard.rslcollective.org/auth/callback"
     );
+  });
+
+  it("does not build a WorkOS logout URL without a WorkOS session ID", () => {
+    expect(
+      getWorkosLogoutUrl({
+        ...env,
+        ENVIRONMENT: "development",
+        DASHBOARD_BASE_URL: "http://localhost:8787"
+      }, null)
+    ).toBeNull();
+  });
+
+  it("uses WorkOS session logout URL with login return target in development", () => {
+    const logoutUrl = getWorkosLogoutUrl({
+      ...env,
+      ENVIRONMENT: "development",
+      DASHBOARD_BASE_URL: "http://localhost:8787"
+    }, "workos_session_test");
+
+    expect(logoutUrl).not.toBeNull();
+    expect(workosMock.getLogoutUrl).toHaveBeenCalledWith({
+      sessionId: "workos_session_test",
+      returnTo: "http://localhost:8787/login"
+    });
+    expect(logoutUrl).not.toContain("dashboard.rslcollective.org");
+  });
+
+  it("uses WorkOS session logout URL with login return target in production", () => {
+    const logoutUrl = getWorkosLogoutUrl({
+      ...env,
+      ENVIRONMENT: "production",
+      DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org"
+    }, "workos_session_test");
+
+    expect(logoutUrl).not.toBeNull();
+    expect(workosMock.getLogoutUrl).toHaveBeenCalledWith({
+      sessionId: "workos_session_test",
+      returnTo: "https://dashboard.rslcollective.org/login"
+    });
   });
 });

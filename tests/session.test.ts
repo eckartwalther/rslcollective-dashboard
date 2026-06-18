@@ -2,7 +2,9 @@ import {
   createClearSessionCookie,
   createLocalSession,
   createSessionCookie,
+  DEVELOPMENT_SESSION_COOKIE_NAME,
   deleteSessionFromRequest,
+  getSessionTokenFromCookie,
   hashSessionToken,
   normalizeReturnTo,
   SESSION_COOKIE_NAME,
@@ -16,6 +18,7 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
+    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -37,6 +40,7 @@ function createStore(session: SessionRow | null = null) {
         user_id: data.userId,
         token_hash: data.tokenHash,
         csrf_token_hash: data.csrfTokenHash ?? null,
+        workos_session_id: data.workosSessionId ?? null,
         expires_at: data.expiresAt
       });
       return session;
@@ -72,12 +76,14 @@ describe("session utilities", () => {
       store,
       "usr_test",
       { ENVIRONMENT: "development" },
+      "workos_session_test",
       new Date("2026-06-11T00:00:00.000Z")
     );
 
     expect(captured.created).toEqual({
       userId: "usr_test",
       tokenHash: result.tokenHash,
+      workosSessionId: "workos_session_test",
       expiresAt: "2026-07-11T00:00:00.000Z"
     });
     expect(captured.created).not.toHaveProperty("token");
@@ -131,10 +137,10 @@ describe("session utilities", () => {
     expect(captured.refreshed).toBeUndefined();
   });
 
-  it("creates a __Host- session cookie with required attributes and no Domain", () => {
+  it("creates a production __Host- session cookie with required attributes and no Domain", () => {
     const cookie = createSessionCookie("token", {
       expiresAt: "2026-07-11T00:00:00.000Z",
-      secure: false
+      env: { ENVIRONMENT: "production" }
     });
 
     expect(cookie).toContain(`${SESSION_COOKIE_NAME}=token`);
@@ -145,13 +151,50 @@ describe("session utilities", () => {
     expect(cookie).not.toContain("Domain=");
   });
 
-  it("always marks __Host- session cookies as Secure", () => {
+  it("creates a development session cookie without Secure", () => {
     const cookie = createSessionCookie("token", {
       expiresAt: "2026-07-11T00:00:00.000Z",
-      secure: false
+      env: { ENVIRONMENT: "development" }
     });
 
-    expect(cookie).toContain("Secure");
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=token`);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).not.toContain("Secure");
+    expect(cookie).not.toContain("Domain=");
+    expect(cookie).not.toContain(`${SESSION_COOKIE_NAME}=`);
+  });
+
+  it("reads the development session cookie in development", () => {
+    expect(
+      getSessionTokenFromCookie(
+        `${DEVELOPMENT_SESSION_COOKIE_NAME}=dev-token; ${SESSION_COOKIE_NAME}=prod-token`,
+        { ENVIRONMENT: "development" }
+      )
+    ).toBe("dev-token");
+  });
+
+  it("falls back to the production session cookie only in development", () => {
+    expect(
+      getSessionTokenFromCookie(`${SESSION_COOKIE_NAME}=prod-token`, {
+        ENVIRONMENT: "development"
+      })
+    ).toBe("prod-token");
+  });
+
+  it("reads only the production session cookie in production", () => {
+    expect(
+      getSessionTokenFromCookie(
+        `${DEVELOPMENT_SESSION_COOKIE_NAME}=dev-token; ${SESSION_COOKIE_NAME}=prod-token`,
+        { ENVIRONMENT: "production" }
+      )
+    ).toBe("prod-token");
+    expect(
+      getSessionTokenFromCookie(`${DEVELOPMENT_SESSION_COOKIE_NAME}=dev-token`, {
+        ENVIRONMENT: "production"
+      })
+    ).toBeNull();
   });
 
   it("normalizes returnTo paths without using the production dashboard host", () => {
@@ -169,9 +212,11 @@ describe("session utilities", () => {
     const request = new Request("https://dashboard.rslcollective.org/logout", {
       headers: { Cookie: `${SESSION_COOKIE_NAME}=${token}` }
     });
-    const cookie = await deleteSessionFromRequest(store, request, { ENVIRONMENT: "production" });
+    const result = await deleteSessionFromRequest(store, request, { ENVIRONMENT: "production" });
+    const cookie = result.cookies.join(", ");
 
     expect(captured.deletedSessionId).toBe("ses_test");
+    expect(result.session?.id).toBe("ses_test");
     expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
     expect(cookie).toContain("Max-Age=0");
     expect(cookie).toContain("HttpOnly");
@@ -181,10 +226,39 @@ describe("session utilities", () => {
     expect(cookie).not.toContain("Domain=");
   });
 
-  it("creates a Secure clearing cookie without a Domain attribute", () => {
-    const cookie = createClearSessionCookie({ secure: false });
+  it("creates a production Secure clearing cookie without a Domain attribute", () => {
+    const cookie = createClearSessionCookie({ ENVIRONMENT: "production" });
 
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
     expect(cookie).toContain("Secure");
     expect(cookie).not.toContain("Domain=");
+  });
+
+  it("creates a development clearing cookie without Secure", () => {
+    const cookie = createClearSessionCookie({ ENVIRONMENT: "development" });
+
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain("Max-Age=0");
+    expect(cookie).not.toContain("Secure");
+    expect(cookie).not.toContain("Domain=");
+  });
+
+  it("clears both development and stale production cookies in development logout", async () => {
+    const token = "logout-token";
+    const tokenHash = await hashSessionToken(token);
+    const { store, captured } = createStore(createSessionRow({ token_hash: tokenHash }));
+    const request = new Request("http://localhost:8787/logout", {
+      headers: { Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}` }
+    });
+    const result = await deleteSessionFromRequest(store, request, { ENVIRONMENT: "development" });
+    const cookies = result.cookies;
+
+    expect(captured.deletedSessionId).toBe("ses_test");
+    expect(result.session?.id).toBe("ses_test");
+    expect(cookies).toHaveLength(2);
+    expect(cookies[0]).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
+    expect(cookies[0]).not.toContain("Secure");
+    expect(cookies[1]).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(cookies[1]).toContain("Secure");
   });
 });

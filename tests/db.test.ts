@@ -3,9 +3,11 @@
 
 import { Miniflare } from "miniflare";
 
-import migration from "../migrations/0001_core.sql?raw";
+import coreMigration from "../migrations/0001_core.sql?raw";
+import workosSessionMigration from "../migrations/0002_sessions_workos_session_id.sql?raw";
 import {
   createCompanyAndAttachUser,
+  createSession,
   getCompanyForUser,
   getUserById,
   type CompanyData,
@@ -57,11 +59,13 @@ async function createD1Harness(): Promise<D1Harness> {
 }
 
 async function applyMigration(db: D1Database) {
-  for (const statement of migration
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean)) {
-    await db.prepare(statement).run();
+  for (const migration of [coreMigration, workosSessionMigration]) {
+    for (const statement of migration
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)) {
+      await db.prepare(statement).run();
+    }
   }
 }
 
@@ -179,6 +183,42 @@ describe("database helper utilities", () => {
 
     expect(nowIso(base)).toBe("2026-06-11T00:00:00.000Z");
     expect(addDaysIso(30, base)).toBe("2026-07-11T00:00:00.000Z");
+  });
+
+  it("stores session token hash and WorkOS session ID without raw tokens", async () => {
+    const { db, dispose } = await createD1Harness();
+
+    try {
+      await insertUser(db, "usr_session");
+
+      const session = await createSession(
+        db,
+        {
+          userId: "usr_session",
+          tokenHash: "hashed-local-token",
+          workosSessionId: "workos_session_test",
+          expiresAt: "2026-07-11T00:00:00.000Z"
+        },
+        {
+          id: "ses_created",
+          timestamp
+        }
+      );
+      const columns = await db
+        .prepare("PRAGMA table_info(sessions)")
+        .all<{ name: string }>();
+      const columnNames = columns.results.map((column) => column.name);
+
+      expect(columnNames).toContain("workos_session_id");
+      expect(session).toMatchObject({
+        id: "ses_created",
+        token_hash: "hashed-local-token",
+        workos_session_id: "workos_session_test"
+      });
+      expect(JSON.stringify(session)).not.toContain("raw-local-token");
+    } finally {
+      await dispose();
+    }
   });
 });
 

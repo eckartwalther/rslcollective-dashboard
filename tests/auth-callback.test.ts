@@ -2,6 +2,7 @@ import { createAuthRoutes, type AuthRouteDeps } from "../worker/routes/auth";
 import {
   AUTH_STATE_TTL_MS,
   createSignedAuthState,
+  DEVELOPMENT_SESSION_COOKIE_NAME,
   hashSessionToken,
   SESSION_COOKIE_NAME,
   type SessionStore
@@ -48,6 +49,7 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_local",
     token_hash: "hash_test",
     csrf_token_hash: null,
+    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -76,6 +78,7 @@ function createHarness(options: {
         user_id: session.userId,
         token_hash: session.tokenHash,
         csrf_token_hash: session.csrfTokenHash ?? null,
+        workos_session_id: session.workosSessionId ?? null,
         expires_at: session.expiresAt
       });
     },
@@ -96,7 +99,8 @@ function createHarness(options: {
           email: "publisher@example.com",
           firstName: "Jane",
           lastName: "Publisher",
-          emailVerified: true
+          emailVerified: true,
+          sessionId: "workos_session_test"
         }
       );
     },
@@ -288,7 +292,8 @@ describe("AuthKit callback", () => {
         email: "updated@example.com",
         firstName: "Updated",
         lastName: "Publisher",
-        emailVerified: false
+        emailVerified: false,
+        sessionId: "workos_session_updated"
       }
     });
     await callbackRequest(
@@ -315,6 +320,7 @@ describe("AuthKit callback", () => {
 
     expect(calls.createdSession).toMatchObject({
       userId: "usr_created",
+      workosSessionId: "workos_session_test",
       expiresAt: expect.any(String)
     });
     expect(calls.createdSession?.tokenHash).toEqual(expect.any(String));
@@ -354,6 +360,36 @@ describe("AuthKit callback", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/dashboard");
+  });
+
+  it("sets the development session cookie on local callback success", async () => {
+    const { routes, calls } = createHarness();
+    const response = await localCallbackRequest(
+      routes,
+      new URLSearchParams({
+        code: "code_valid",
+        state: await signedState({
+          flow: "login",
+          secret: localEnv.SESSION_SECRET
+        })
+      })
+    );
+    const cookie = response.headers.get("Set-Cookie");
+
+    expect(response.status).toBe(302);
+    expect(calls.createdSession).toMatchObject({
+      userId: "usr_created",
+      workosSessionId: "workos_session_test",
+      expiresAt: expect.any(String)
+    });
+    expect(calls.createdSession).not.toHaveProperty("token");
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).not.toContain("Secure");
+    expect(cookie).not.toContain("Domain=");
+    expect(cookie).not.toContain(`${SESSION_COOKIE_NAME}=`);
   });
 
   it("redirects local callback success to a relative returnTo path", async () => {

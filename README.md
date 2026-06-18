@@ -25,12 +25,16 @@ pnpm db:migrate:local
 pnpm worker:dev
 ```
 
+`pnpm worker:dev` uses the local-safe `wrangler.jsonc` and does not include the production `dashboard.rslcollective.org` custom-domain route.
+
 Production migration and deploy:
 
 ```sh
 pnpm db:migrate:remote
 pnpm worker:deploy
 ```
+
+Production deploy uses `wrangler.production.jsonc`, which contains the `dashboard.rslcollective.org` custom-domain route.
 
 ## Deployment
 

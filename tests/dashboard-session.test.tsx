@@ -110,6 +110,8 @@ describe("dashboard session wiring", () => {
       const form = document.querySelector<HTMLFormElement>('form[action="/logout"]');
 
       expect(form).not.toBeNull();
+      expect(form?.getAttribute("action")).toBe("/logout");
+      expect(form?.getAttribute("action")).not.toContain("dashboard.rslcollective.org");
       expect(form?.method).toBe("post");
       expect(submitSpy).toHaveBeenCalledTimes(1);
     });

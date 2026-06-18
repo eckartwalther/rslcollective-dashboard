@@ -7,7 +7,6 @@ export type WorkosAuthEnv = {
   WORKOS_CLIENT_ID?: string;
   WORKOS_REDIRECT_URI?: string;
   WORKOS_API_KEY?: string;
-  WORKOS_LOGOUT_URI?: string;
   DASHBOARD_BASE_URL?: string;
   SESSION_SECRET?: string;
   ENVIRONMENT?: string;
@@ -83,23 +82,33 @@ export type WorkosAuthenticatedUser = {
   firstName?: string | null;
   lastName?: string | null;
   emailVerified?: boolean;
+  sessionId: string;
 };
 
 export async function exchangeWorkosAuthorizationCode(env: WorkosAuthEnv, code: string) {
   assertWorkosExchangeConfig(env);
   const workos = new WorkOS(env.WORKOS_API_KEY);
 
+  let response: AuthenticationResponse;
+
   try {
-    const response = await workos.userManagement.authenticateWithCode({
+    response = await workos.userManagement.authenticateWithCode({
       code,
       clientId: env.WORKOS_CLIENT_ID
     });
-
-    return mapWorkosAuthenticateResponse(response);
   } catch (error) {
     logWorkosExchangeFailure(env, error, code);
     throw new Error("WorkOS authorization code exchange failed.");
   }
+
+  const sessionId = extractWorkosSessionId(response);
+
+  if (!sessionId) {
+    logMissingWorkosSessionId(env, response);
+    throw new Error("WorkOS authentication response did not include a session ID.");
+  }
+
+  return mapWorkosAuthenticateResponse(response, sessionId);
 }
 
 export function assertWorkosExchangeConfig(
@@ -114,18 +123,19 @@ export function assertWorkosExchangeConfig(
   }
 }
 
-export function getWorkosLogoutUrl(env: WorkosAuthEnv) {
-  const returnTo = env.WORKOS_LOGOUT_URI ?? env.DASHBOARD_BASE_URL;
+export function getWorkosLogoutUrl(env: WorkosAuthEnv, sessionId: string | null | undefined) {
+  const returnTo = buildLogoutReturnTo(env);
 
-  if (!env.WORKOS_CLIENT_ID || !returnTo) {
+  if (!sessionId || !returnTo) {
     return null;
   }
 
-  const url = new URL("https://api.workos.com/user_management/logout");
-  url.searchParams.set("client_id", env.WORKOS_CLIENT_ID);
-  url.searchParams.set("return_to", returnTo);
+  const workos = new WorkOS(env.WORKOS_API_KEY);
 
-  return url.toString();
+  return workos.userManagement.getLogoutUrl({
+    sessionId,
+    returnTo
+  });
 }
 
 function buildUrl(baseUrl: string, path: string) {
@@ -136,7 +146,10 @@ function buildUrl(baseUrl: string, path: string) {
   }
 }
 
-function mapWorkosAuthenticateResponse(response: AuthenticationResponse): WorkosAuthenticatedUser {
+function mapWorkosAuthenticateResponse(
+  response: AuthenticationResponse,
+  sessionId: string
+): WorkosAuthenticatedUser {
   const user = response.user;
 
   if (!user?.id || !user.email) {
@@ -148,8 +161,87 @@ function mapWorkosAuthenticateResponse(response: AuthenticationResponse): Workos
     email: user.email,
     firstName: user.firstName ?? null,
     lastName: user.lastName ?? null,
-    emailVerified: user.emailVerified ?? false
+    emailVerified: user.emailVerified ?? false,
+    sessionId
   };
+}
+
+function extractWorkosSessionId(response: AuthenticationResponse) {
+  const responseRecord = response as AuthenticationResponse & {
+    sessionId?: unknown;
+    session_id?: unknown;
+  };
+
+  if (typeof responseRecord.sessionId === "string" && responseRecord.sessionId) {
+    return responseRecord.sessionId;
+  }
+
+  if (typeof responseRecord.session_id === "string" && responseRecord.session_id) {
+    return responseRecord.session_id;
+  }
+
+  return extractSessionIdFromAccessToken(response.accessToken);
+}
+
+function extractSessionIdFromAccessToken(accessToken: string | undefined) {
+  if (!accessToken) {
+    return null;
+  }
+
+  try {
+    const [, payload] = accessToken.split(".");
+
+    if (!payload) {
+      return null;
+    }
+
+    const decoded = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload))) as {
+      sid?: unknown;
+    };
+
+    return typeof decoded.sid === "string" && decoded.sid ? decoded.sid : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildLogoutReturnTo(env: WorkosAuthEnv) {
+  if (!env.DASHBOARD_BASE_URL) {
+    return null;
+  }
+
+  return buildUrl(env.DASHBOARD_BASE_URL, "/login");
+}
+
+function logMissingWorkosSessionId(env: WorkosAuthEnv, response: AuthenticationResponse) {
+  if (env.ENVIRONMENT === "production") {
+    return;
+  }
+
+  const responseRecord = response as AuthenticationResponse & {
+    sessionId?: unknown;
+    session_id?: unknown;
+  };
+
+  console.error({
+    event: "workos_session_id_missing",
+    hasSessionIdField: typeof responseRecord.sessionId === "string",
+    hasSessionSnakeField: typeof responseRecord.session_id === "string",
+    hasAccessToken: Boolean(response.accessToken)
+  });
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
 }
 
 function logWorkosExchangeFailure(

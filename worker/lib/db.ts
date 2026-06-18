@@ -39,6 +39,7 @@ export type SessionRow = {
   user_id: string;
   token_hash: string;
   csrf_token_hash: string | null;
+  workos_session_id: string | null;
   expires_at: string;
   created_at: string;
   updated_at: string;
@@ -72,6 +73,7 @@ export type SessionData = {
   userId: string;
   tokenHash: string;
   csrfTokenHash?: string | null;
+  workosSessionId?: string | null;
   expiresAt: string;
 };
 
@@ -337,16 +339,18 @@ export async function createSession(
         user_id,
         token_hash,
         csrf_token_hash,
+        workos_session_id,
         expires_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
       session.userId,
       session.tokenHash,
       nullable(session.csrfTokenHash),
+      nullable(session.workosSessionId),
       session.expiresAt,
       timestamp,
       timestamp

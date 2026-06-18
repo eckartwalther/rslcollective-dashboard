@@ -49,7 +49,7 @@ export type AuthRouteDeps = {
     db: D1Database,
     user: WorkosUserData
   ) => Promise<UserRow | null>;
-  getLogoutUrl: (env: WorkosAuthEnv) => string | null;
+  getLogoutUrl: (env: WorkosAuthEnv, sessionId: string | null | undefined) => string | null;
 };
 
 const defaultDeps: AuthRouteDeps = {
@@ -104,15 +104,12 @@ export function createAuthRoutes(deps: AuthRouteDeps = defaultDeps) {
     }
 
     const store = deps.createSessionStore(c.env.DB);
-    const clearCookie = await deleteSessionFromRequest(store, c.req.raw, c.env);
-    const logoutUrl = deps.getLogoutUrl(c.env);
-    const fallbackLogoutUrl = c.env.ENVIRONMENT === "production" ? null : "/login";
-    const redirectUrl = logoutUrl ?? fallbackLogoutUrl;
+    const deleteResult = await deleteSessionFromRequest(store, c.req.raw, c.env);
+    const logoutUrl = deps.getLogoutUrl(c.env, deleteResult.session?.workos_session_id);
+    const redirectUrl = logoutUrl ?? "/login";
 
-    c.header("Set-Cookie", clearCookie);
-
-    if (!redirectUrl) {
-      return serverError(c, "WorkOS logout is not configured.");
+    for (const clearCookie of deleteResult.cookies) {
+      c.header("Set-Cookie", clearCookie, { append: true });
     }
 
     return c.redirect(redirectUrl);
@@ -158,7 +155,12 @@ async function handleAuthCallback(c: Context<{ Bindings: Bindings }>, deps: Auth
     return serverError(c, "Local user could not be saved.");
   }
 
-  const session = await createLocalSession(deps.createSessionStore(c.env.DB), user.id, c.env);
+  const session = await createLocalSession(
+    deps.createSessionStore(c.env.DB),
+    user.id,
+    c.env,
+    workosUser.sessionId
+  );
 
   if (!session.session) {
     return serverError(c, "Local session could not be created.");

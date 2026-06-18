@@ -1,6 +1,8 @@
 import { authRoutes } from "../worker/routes/auth";
 import {
   AUTH_STATE_TTL_MS,
+  DEVELOPMENT_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
   createSignedAuthState,
   validateSignedAuthState
 } from "../worker/lib/session";
@@ -82,6 +84,40 @@ describe("AuthKit authorization routes", () => {
     expect(response.status).toBe(302);
     expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:8787/auth/callback");
     expect(url.toString()).not.toContain("dashboard.rslcollective.org/auth/callback");
+  });
+
+  it("uses DASHBOARD_BASE_URL for local development register redirect URI", async () => {
+    const response = await authRoutes.fetch(new Request("http://localhost:8787/register"), localEnv);
+    const location = response.headers.get("Location");
+
+    if (!location) {
+      throw new Error("Missing Location header.");
+    }
+
+    const url = new URL(location);
+
+    expect(response.status).toBe(302);
+    expect(url.searchParams.get("screen_hint")).toBe("sign-up");
+    expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:8787/auth/callback");
+    expect(url.toString()).not.toContain("dashboard.rslcollective.org/auth/callback");
+  });
+
+  it("falls back to local /login on development logout without a WorkOS session ID", async () => {
+    const response = await authRoutes.fetch(
+      new Request("http://localhost:8787/logout", {
+        method: "POST",
+        headers: { Origin: "http://localhost:8787" }
+      }),
+      localEnv
+    );
+    const cookie = response.headers.get("Set-Cookie");
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/login");
+    expect(response.headers.get("Location")).not.toContain("dashboard.rslcollective.org");
+    expect(cookie).toContain(`${DEVELOPMENT_SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain("Max-Age=0");
   });
 
   it("includes signed state that validates when untampered", async () => {

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiJson } from "./client";
+import { browserRuntimeSnapshot, isFrontendRuntimeDiagnosticsEnabled } from "./runtimeDiagnostics";
 
 export const sessionQueryKey = ["session"] as const;
 
@@ -37,5 +38,19 @@ export function signOut() {
   form.action = "/logout";
   form.style.display = "none";
   document.body.appendChild(form);
+  logLogoutSubmitDebug(form);
   form.submit();
+}
+
+function logLogoutSubmitDebug(form: HTMLFormElement) {
+  if (!isFrontendRuntimeDiagnosticsEnabled()) {
+    return;
+  }
+
+  console.info({
+    event: "logout_submit_debug",
+    ...browserRuntimeSnapshot(),
+    formAction: form.action,
+    formMethod: form.method
+  });
 }
