@@ -211,7 +211,7 @@ describe("dashboard behavior", () => {
     expect(await screen.findByText("Publisher profile submitted")).toBeInTheDocument();
     expect(screen.getByText("Your publisher profile is under review.")).toBeInTheDocument();
     expect(screen.getByText("Example Media Inc.")).toBeInTheDocument();
-    expect(screen.getByText("Create and verify publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("Define publisher profile")).toBeInTheDocument();
     expect(screen.getByText("Complete publisher verification")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Verify profile" })).toBeDisabled();
     expect(screen.getByText("Review licensing terms")).toBeInTheDocument();

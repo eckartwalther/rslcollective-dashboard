@@ -41,17 +41,17 @@ const dashboardCopy = {
   },
   gettingStarted: {
     sectionTitle: "Getting started",
-    noProfileHeading: "Create publisher profile",
+    noProfileHeading: "Define publisher profile",
     noProfileDescription: "Submit your publisher information for RSL Collective verification.",
-    noProfileAction: "Create publisher profile",
+    noProfileAction: "Define publisher profile",
     submittedHeading: "Publisher profile submitted",
     submittedDescription: "Your publisher profile is under review.",
-    submittedAction: "Edit publisher profile"
+    submittedAction: "Edit profile"
   },
   cards: {
     publisherProfile: {
-      title: "Create and verify publisher profile",
-      description: "Submit your publisher identity, contact, and business information."
+      title: "Define publisher profile",
+      description: "Define and edit your publisher company information."
     },
     verification: {
       title: "Complete publisher verification",
@@ -182,7 +182,7 @@ export function DashboardHome({
           color={hasCompany ? "green" : "yellow"}
           action={
             <Button variant="light" size="xs" w="fit-content" onClick={onNavigateToCompany}>
-              {hasCompany ? "Review profile" : dashboardCopy.gettingStarted.noProfileAction}
+              {hasCompany ? "Edit profile" : dashboardCopy.gettingStarted.noProfileAction}
             </Button>
           }
         />
