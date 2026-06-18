@@ -1,5 +1,3 @@
-import { browserRuntimeSnapshot, isFrontendRuntimeDiagnosticsEnabled } from "./runtimeDiagnostics";
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -30,14 +28,10 @@ export async function apiJson<T>(path: string, init: RequestInit = {}) {
 }
 
 export function apiRequest(path: string, init: RequestInit = {}) {
-  const requestInit = {
+  return fetch(path, {
     credentials: "include",
     ...init
-  } satisfies RequestInit;
-
-  logFrontendApiRequest(path, requestInit);
-
-  return fetch(path, requestInit);
+  });
 }
 
 export async function readJsonBody(response: Response) {
@@ -62,17 +56,4 @@ function apiErrorMessage(body: unknown, response: Response) {
   }
 
   return `Request failed with status ${response.status}.`;
-}
-
-function logFrontendApiRequest(path: string, init: RequestInit) {
-  if (!isFrontendRuntimeDiagnosticsEnabled()) {
-    return;
-  }
-
-  console.info({
-    event: "frontend_api_request",
-    method: init.method ?? "GET",
-    url: path,
-    ...browserRuntimeSnapshot()
-  });
 }

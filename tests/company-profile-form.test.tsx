@@ -36,12 +36,14 @@ function renderWithProviders(ui: ReactElement) {
   return render(<AppProviders>{ui}</AppProviders>);
 }
 
-function fillValidProfile(overrides: Record<string, string> = {}) {
-  const values = {
+async function fillValidProfile(overrides: Record<string, string> = {}) {
+  const { Country: country = "United States", ...values } = {
     "Legal company name": "Example Media Inc.",
     "Primary contact name": "Jane Publisher",
     "Primary contact email": "jane@example.com",
-    Country: "us",
+    City: "Los Angeles",
+    "Postal code": "90001",
+    "Business address line 1": "123 Main Street",
     ...overrides
   };
 
@@ -50,6 +52,8 @@ function fillValidProfile(overrides: Record<string, string> = {}) {
       target: { value }
     });
   }
+
+  await selectCountry(country);
 }
 
 function readLastJsonBody(fetchMock: ReturnType<typeof vi.fn>) {
@@ -67,6 +71,11 @@ function getInputByLabel(label: RegExp) {
   }
 
   return input;
+}
+
+async function selectCountry(countryLabel: string) {
+  fireEvent.click(getInputByLabel(/^Country/i));
+  fireEvent.click(await screen.findByText(countryLabel));
 }
 
 describe("CompanyProfileForm", () => {
@@ -103,7 +112,7 @@ describe("CompanyProfileForm", () => {
 
     expect(await screen.findByDisplayValue("Example Media Inc.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Jane Publisher")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("US")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("United States")).toBeInTheDocument();
     expect(screen.queryByText("Billing contact")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Billing contact email/i)).not.toBeInTheDocument();
   });
@@ -115,11 +124,14 @@ describe("CompanyProfileForm", () => {
 
     expect(await screen.findByText("Legal publisher name is required.")).toBeInTheDocument();
     expect(screen.getByText("Primary contact name is required.")).toBeInTheDocument();
+    expect(screen.getByText("Business address line 1 is required.")).toBeInTheDocument();
+    expect(screen.getByText("City is required.")).toBeInTheDocument();
+    expect(screen.getByText("Postal code is required.")).toBeInTheDocument();
   });
 
   it("renders invalid email errors", async () => {
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile({ "Primary contact email": "not-an-email" });
+    await fillValidProfile({ "Primary contact email": "not-an-email" });
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 
@@ -136,11 +148,21 @@ describe("CompanyProfileForm", () => {
     }
   });
 
+  it("renders Country as a searchable selection list", async () => {
+    renderWithProviders(<CompanyProfileForm company={null} />);
+
+    const country = getInputByLabel(/^Country/i);
+    fireEvent.click(country);
+
+    expect(country).toHaveAttribute("aria-haspopup", "listbox");
+    expect(await screen.findByText("United States")).toBeInTheDocument();
+  });
+
   it("submits only allowed company profile fields to /api/company", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 201));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile();
+    await fillValidProfile();
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 
@@ -164,11 +186,28 @@ describe("CompanyProfileForm", () => {
     expect(readLastJsonBody(fetchMock)).not.toHaveProperty("billingContactEmail");
   });
 
+  it("submits the selected country as an ISO country code", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<CompanyProfileForm company={null} />);
+    await fillValidProfile({ Country: "Germany" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/company", expect.any(Object)));
+    expect(readLastJsonBody(fetchMock)).toMatchObject({
+      country: "DE",
+      addressLine1: "123 Main Street",
+      city: "Los Angeles",
+      postalCode: "90001"
+    });
+  });
+
   it("submits through the lower save profile button", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 201));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile();
+    await fillValidProfile();
 
     const saveButtons = screen.getAllByRole("button", { name: /save profile/i });
     fireEvent.click(saveButtons[1]);
@@ -185,7 +224,7 @@ describe("CompanyProfileForm", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }, 201));
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile();
+    await fillValidProfile();
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 
@@ -214,7 +253,7 @@ describe("CompanyProfileForm", () => {
       )
     );
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile();
+    await fillValidProfile();
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 
@@ -241,7 +280,7 @@ describe("CompanyProfileForm", () => {
       )
     );
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile({ "Legal company name": "Draft Publisher" });
+    await fillValidProfile({ "Legal company name": "Draft Publisher" });
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 
@@ -252,7 +291,7 @@ describe("CompanyProfileForm", () => {
   it("disables submit while saving", async () => {
     vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => undefined)));
     renderWithProviders(<CompanyProfileForm company={null} />);
-    fillValidProfile();
+    await fillValidProfile();
 
     fireEvent.click(screen.getAllByRole("button", { name: /save profile/i })[0]);
 

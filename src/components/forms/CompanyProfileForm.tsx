@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ZodError } from "zod";
 import { ApiError } from "../../api/client";
 import { type Company, useSaveCompanyMutation } from "../../api/company";
+import { countryOptions } from "../../constants/countries";
 import {
   companyProfileSchema,
   companyTypeValues
@@ -167,12 +168,14 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
         >
           <Stack gap="sm">
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              <TextInput
+              <Select
                 label="Country"
+                data={countryOptions}
                 value={values.country}
                 error={fieldErrors.country}
                 required
-                onChange={(event) => updateValue("country", event.currentTarget.value)}
+                searchable
+                onChange={(value) => updateValue("country", value ?? "")}
               />
               <TextInput
                 label="State/region"
@@ -184,12 +187,14 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
                 label="City"
                 value={values.city ?? ""}
                 error={fieldErrors.city}
+                required
                 onChange={(event) => updateValue("city", event.currentTarget.value)}
               />
               <TextInput
                 label="Postal code"
                 value={values.postalCode ?? ""}
                 error={fieldErrors.postalCode}
+                required
                 onChange={(event) => updateValue("postalCode", event.currentTarget.value)}
               />
             </SimpleGrid>
@@ -197,6 +202,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
               label="Business address line 1"
               value={values.addressLine1 ?? ""}
               error={fieldErrors.addressLine1}
+              required
               onChange={(event) => updateValue("addressLine1", event.currentTarget.value)}
             />
             <TextInput

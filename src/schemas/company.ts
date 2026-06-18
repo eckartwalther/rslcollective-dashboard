@@ -52,12 +52,13 @@ export const companyProfileSchema = z
     country: z
       .string({ error: "Country is required." })
       .trim()
+      .min(1, "Country is required.")
       .toUpperCase()
       .regex(/^[A-Z]{2}$/, "Country must be an ISO 3166-1 alpha-2 code."),
     region: optionalString(100),
-    city: optionalString(100),
-    postalCode: optionalString(40),
-    addressLine1: optionalString(200),
+    city: requiredString("City", 1, 100),
+    postalCode: requiredString("Postal code", 1, 40),
+    addressLine1: requiredString("Business address line 1", 1, 200),
     addressLine2: optionalString(200),
     description: optionalString(2000)
   })
@@ -65,7 +66,10 @@ export const companyProfileSchema = z
     legalName: true,
     primaryContactName: true,
     primaryContactEmail: true,
-    country: true
+    country: true,
+    city: true,
+    postalCode: true,
+    addressLine1: true
   });
 
 export type CompanyProfileInput = z.input<typeof companyProfileSchema>;

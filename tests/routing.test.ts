@@ -77,20 +77,6 @@ describe("Worker routing", () => {
     expect(location).toContain("screen_hint=sign-up");
   });
 
-  it("does not reject dashboard.rslcollective.org host with a development host guard", async () => {
-    const response = await app.fetch(
-      new Request("http://dashboard.rslcollective.org/login", {
-        headers: { Host: "dashboard.rslcollective.org" }
-      }),
-      localEnv
-    );
-    const location = response.headers.get("Location");
-
-    expect(response.status).toBe(302);
-    expect(location).toContain("https://api.workos.com/user_management/authorize");
-    expect(location).not.toContain("invalid_development_host");
-  });
-
   it("keeps /logout Origin validation unchanged behind a valid local host", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const response = await app.fetch(

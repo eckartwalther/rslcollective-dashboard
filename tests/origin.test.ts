@@ -19,9 +19,9 @@ const validPayload = {
   primaryContactEmail: "jane@example.com",
   country: "us",
   region: "",
-  city: "",
-  postalCode: "",
-  addressLine1: "",
+  city: "Los Angeles",
+  postalCode: "90001",
+  addressLine1: "123 Main Street",
   addressLine2: "",
   description: ""
 };
@@ -214,7 +214,7 @@ describe("Origin validation", () => {
     warnSpy.mockRestore();
   });
 
-  it("logs the actual request Origin header in development diagnostics", async () => {
+  it("logs a reduced safe Origin rejection diagnostic in development", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const response = await authRoutes.request(
       "http://localhost:8787/logout",
@@ -241,18 +241,18 @@ describe("Origin validation", () => {
     expect(log).toMatchObject({
       event: "origin_rejected",
       method: "POST",
-      url: "http://localhost:8787/logout",
       path: "/logout",
-      host: "localhost:8787",
       origin: "http://dashboard.rslcollective.org",
-      referer: "http://localhost:8787/dashboard/company",
       dashboardBaseUrl: "http://localhost:8787",
       environment: "development",
-      productionMode: false,
-      normalizedOrigin: "http://dashboard.rslcollective.org",
-      normalizedDashboardBaseUrl: "http://localhost:8787",
       reason: "mismatched_origin"
     });
+    expect(log).not.toHaveProperty("url");
+    expect(log).not.toHaveProperty("host");
+    expect(log).not.toHaveProperty("referer");
+    expect(log).not.toHaveProperty("productionMode");
+    expect(log).not.toHaveProperty("normalizedOrigin");
+    expect(log).not.toHaveProperty("normalizedDashboardBaseUrl");
     expect(log).not.toHaveProperty("cookie");
     expect(log).not.toHaveProperty("authorization");
     warnSpy.mockRestore();

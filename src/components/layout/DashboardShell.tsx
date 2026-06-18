@@ -26,7 +26,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SessionUser } from "../../api/session";
 import { useCompanyQuery } from "../../api/company";
-import { browserRuntimeSnapshot, isFrontendRuntimeDiagnosticsEnabled } from "../../api/runtimeDiagnostics";
 import { AccountTab } from "../dashboard/AccountTab";
 import { CompanyProfileTab } from "../dashboard/CompanyProfileTab";
 import { DashboardHome } from "../dashboard/DashboardHome";
@@ -63,10 +62,6 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
   const companyQuery = useCompanyQuery(true);
   const company = companyQuery.data?.company;
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
-
-  useEffect(() => {
-    logDashboardShellRuntime();
-  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -248,15 +243,4 @@ function pathForView(view: DashboardView) {
   }
 
   return "/dashboard";
-}
-
-function logDashboardShellRuntime() {
-  if (!isFrontendRuntimeDiagnosticsEnabled()) {
-    return;
-  }
-
-  console.info({
-    event: "dashboard_shell_runtime",
-    ...browserRuntimeSnapshot()
-  });
 }

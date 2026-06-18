@@ -27,9 +27,6 @@ describe("companyProfileSchema", () => {
       displayName: " ",
       billingContactEmail: "",
       region: "",
-      city: " ",
-      postalCode: "",
-      addressLine1: "",
       addressLine2: " ",
       description: ""
     });
@@ -37,11 +34,29 @@ describe("companyProfileSchema", () => {
     expect(parsed.displayName).toBeNull();
     expect(parsed.billingContactEmail).toBeNull();
     expect(parsed.region).toBeNull();
-    expect(parsed.city).toBeNull();
-    expect(parsed.postalCode).toBeNull();
-    expect(parsed.addressLine1).toBeNull();
     expect(parsed.addressLine2).toBeNull();
     expect(parsed.description).toBeNull();
+  });
+
+  it.each([
+    ["addressLine1", "Business address line 1 is required."],
+    ["city", "City is required."],
+    ["postalCode", "Postal code is required."]
+  ])("rejects missing %s", (field, message) => {
+    expect(() => companyProfileSchema.parse(omitField(validPayload, field))).toThrow(message);
+  });
+
+  it.each([
+    ["addressLine1", " ", "Business address line 1 is required."],
+    ["city", "", "City is required."],
+    ["postalCode", " ", "Postal code is required."]
+  ])("rejects empty %s", (field, value, message) => {
+    expect(() =>
+      companyProfileSchema.parse({
+        ...validPayload,
+        [field]: value
+      })
+    ).toThrow(message);
   });
 
   it("rejects invalid email fields", () => {
@@ -132,6 +147,18 @@ describe("companyProfileSchema", () => {
     ).toBe("GB");
   });
 
+  it("rejects missing or empty country", () => {
+    expect(() => companyProfileSchema.parse(omitField(validPayload, "country"))).toThrow(
+      "Country is required."
+    );
+    expect(() =>
+      companyProfileSchema.parse({
+        ...validPayload,
+        country: " "
+      })
+    ).toThrow("Country is required.");
+  });
+
   it("rejects invalid country values", () => {
     expect(() =>
       companyProfileSchema.parse({
@@ -148,3 +175,7 @@ describe("companyProfileSchema", () => {
     ).toThrow();
   });
 });
+
+function omitField<T extends Record<string, unknown>>(payload: T, field: string) {
+  return Object.fromEntries(Object.entries(payload).filter(([key]) => key !== field));
+}

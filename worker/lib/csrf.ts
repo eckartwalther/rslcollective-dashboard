@@ -118,16 +118,10 @@ function logDevelopmentOriginRejection<T extends OriginEnv>(
     JSON.stringify({
       event: "origin_rejected",
       method: c.req.method,
-      url: c.req.url,
       path: new URL(c.req.url).pathname,
-      host: c.req.header("Host") ?? null,
       origin: c.req.header("Origin") ?? null,
-      referer: c.req.header("Referer") ?? null,
       dashboardBaseUrl: result.dashboardBaseUrl,
       environment: result.environment,
-      productionMode: result.productionMode,
-      normalizedOrigin: result.normalizedRequestOrigin,
-      normalizedDashboardBaseUrl: result.normalizedDashboardOrigin,
       reason: result.reason
     })
   );

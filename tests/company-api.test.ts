@@ -11,9 +11,9 @@ const validPayload = {
   billingContactEmail: "",
   country: "us",
   region: "",
-  city: "",
-  postalCode: "",
-  addressLine1: "",
+  city: "Los Angeles",
+  postalCode: "90001",
+  addressLine1: "123 Main Street",
   addressLine2: "",
   description: ""
 };
@@ -396,6 +396,35 @@ describe("company API", () => {
     });
   });
 
+  it.each([
+    ["addressLine1"],
+    ["city"],
+    ["postalCode"]
+  ])("rejects PUT payloads missing %s", async (field) => {
+    const { route } = createHarness();
+    const response = await route.request(
+      "/",
+      {
+        method: "PUT",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+          Origin: "https://dashboard.rslcollective.org"
+        }),
+        body: JSON.stringify(omitField(validPayload, field))
+      },
+      productionEnv
+    );
+    const body = await readJson(response);
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "Invalid company profile."
+      }
+    });
+  });
+
   it("includes every editable field in the company response", async () => {
     const { route } = createHarness({
       user: createUser({ company_id: "cmp_existing" }),
@@ -430,3 +459,7 @@ describe("company API", () => {
     );
   });
 });
+
+function omitField<T extends Record<string, unknown>>(payload: T, field: string) {
+  return Object.fromEntries(Object.entries(payload).filter(([key]) => key !== field));
+}
