@@ -212,7 +212,7 @@ describe("company API hooks", () => {
     expect(screen.getByText(/loading publisher profile/i)).toBeInTheDocument();
   });
 
-  it("renders the empty company placeholder state", async () => {
+  it("renders the editable company form state when no company exists", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({ company: null })));
 
     render(
@@ -221,7 +221,8 @@ describe("company API hooks", () => {
       </AppProviders>
     );
 
-    expect(await screen.findByText(/no publisher profile has been created yet/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Legal company name/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no publisher profile has been created yet/i)).not.toBeInTheDocument();
   });
 
   it("renders the existing company form state", async () => {

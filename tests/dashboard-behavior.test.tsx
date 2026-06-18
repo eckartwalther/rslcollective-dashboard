@@ -151,8 +151,10 @@ describe("dashboard behavior", () => {
     renderDashboard();
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(await screen.findByText("Create your publisher profile")).toBeInTheDocument();
-    expect(screen.getByText("Waiting for publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("License your content and receive royalties through the RSL Collective.")).toBeInTheDocument();
+    expect(await screen.findByText("Create publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("Submit your publisher information for RSL Collective verification.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Create publisher profile" })).toHaveLength(1);
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 
@@ -192,7 +194,7 @@ describe("dashboard behavior", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Account Information/i }));
 
-    expect(await screen.findByText("Publisher role")).toBeInTheDocument();
+    expect(await screen.findByText("Account role")).toBeInTheDocument();
     expect(screen.getByText("owner")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "RSL Internet Collective dashboard" }));
@@ -201,34 +203,44 @@ describe("dashboard behavior", () => {
     expect(window.location.pathname).toBe("/dashboard");
   });
 
-  it("shows company summary and approval-gated status cards for an existing company", async () => {
+  it("shows submitted profile copy and operational status cards for an existing company", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    expect(await screen.findByText("Publisher summary")).toBeInTheDocument();
+    expect(await screen.findByText("Publisher profile submitted")).toBeInTheDocument();
+    expect(screen.getByText("Your publisher profile is under review.")).toBeInTheDocument();
     expect(screen.getByText("Example Media Inc.")).toBeInTheDocument();
-    expect(screen.getByText("Publisher verification: Pending review")).toBeInTheDocument();
-    expect(screen.getAllByText("Pending review").length).toBeGreaterThan(0);
-    expect(screen.getByText("Define your licensable content repertoire")).toBeInTheDocument();
+    expect(screen.getByText("Create and verify publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("Complete publisher verification")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verify profile" })).toBeDisabled();
+    expect(screen.getByText("Review licensing terms")).toBeInTheDocument();
+    expect(screen.getByText("Review and agree to the RSL Collective licensing terms.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review licensing terms" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review licensing terms" })).not.toBeInTheDocument();
+    expect(screen.getByText("Define licensable content")).toBeInTheDocument();
     expect(screen.getByText("Manage licensee exclusions")).toBeInTheDocument();
-    expect(screen.getByText("Review reporting activity")).toBeInTheDocument();
-    expect(screen.getByText("Prepare enrollment readiness")).toBeInTheDocument();
-    expect(screen.getByText("Set up licensing payments")).toBeInTheDocument();
-    expect(screen.getAllByText("Pending approval").length).toBeGreaterThan(0);
+    expect(screen.getByText("View licensing and settlement reports")).toBeInTheDocument();
+    expect(screen.getByText("Set up royalty payments")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 
-  it("does not use coming-soon language for verification-locked capabilities", async () => {
+  it("does not use prohibited dashboard home phrases", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    await screen.findByText("Publisher summary");
+    await screen.findByText("Publisher profile submitted");
 
-    expect(document.body.textContent ?? "").not.toMatch(/coming soon/i);
-    expect(document.body.textContent ?? "").not.toContain(
-      "Future modules are visible for orientation only. They are not configured yet."
-    );
+    const text = document.body.textContent ?? "";
+
+    expect(text).not.toMatch(/disabled/i);
+    expect(text).not.toMatch(/coming soon/i);
+    expect(text).not.toMatch(/future module/i);
+    expect(text).not.toMatch(/not configured yet/i);
+    expect(text).not.toMatch(/once enabled/i);
+    expect(text).not.toMatch(/locked until/i);
+    expect(text).not.toMatch(/next steps/i);
   });
 
   it("does not navigate when disabled approval-gated modules are clicked", async () => {
@@ -248,7 +260,11 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    await screen.findByText("Publisher summary");
+    await screen.findByText("Publisher profile submitted");
+    fireEvent.click(screen.getByRole("button", { name: "Verify profile" }));
+
+    expect(window.location.pathname).toBe("/dashboard");
+
     const calledPaths = fetchMock.mock.calls.map(([path]) => path);
 
     expect(calledPaths).toEqual(expect.arrayContaining(["/api/session", "/api/company"]));
@@ -258,5 +274,6 @@ describe("dashboard behavior", () => {
     expect(calledPaths).not.toContain("/api/licensee-exclusions");
     expect(calledPaths).not.toContain("/api/enrollment");
     expect(calledPaths).not.toContain("/api/payments");
+    expect(calledPaths).not.toContain("/api/licensing-terms");
   });
 });

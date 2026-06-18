@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Select, SimpleGrid, Stack, TextInput, Textarea } from "@mantine/core";
+import { Alert, Button, Card, Group, Select, SimpleGrid, Stack, TextInput, Textarea } from "@mantine/core";
 import { FormEvent, useEffect, useState } from "react";
 import { ZodError } from "zod";
 import { ApiError } from "../../api/client";
@@ -102,14 +102,20 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
           </Alert>
         ) : null}
 
+        <Group justify="flex-end" w="100%">
+          <Button type="submit" loading={saveCompanyMutation.isPending} w="fit-content">
+            Save profile
+          </Button>
+        </Group>
+
         <FormSection
-          title="Company identity"
-          description="Core publisher identity details for the profile record."
+          title="Publisher identity"
+          description="Company name and information."
           withDivider={false}
         >
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput
-              label="Legal publisher name"
+              label="Legal company name"
               value={values.legalName}
               error={fieldErrors.legalName}
               required
@@ -134,7 +140,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
 
         <FormSection
           title="Primary contact"
-          description="Main representative contact for this publisher profile."
+          description="Contact information."
         >
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <TextInput
@@ -157,7 +163,7 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
 
         <FormSection
           title="Address"
-          description="Basic business address details for the publisher profile."
+          description="Company address."
         >
           <Stack gap="sm">
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
@@ -204,10 +210,10 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
 
         <FormSection
           title="Description"
-          description="Optional short context about the company."
+          description="Optional additional publisher and verification information."
         >
           <Textarea
-            label="Publisher description"
+            label="Additional information"
             value={values.description ?? ""}
             error={fieldErrors.description}
             autosize
@@ -216,9 +222,11 @@ export function CompanyProfileForm({ company }: CompanyProfileFormProps) {
           />
         </FormSection>
 
-        <Button type="submit" loading={saveCompanyMutation.isPending} w="fit-content">
-          Save publisher profile
-        </Button>
+        <Group justify="flex-end" w="100%">
+          <Button type="submit" loading={saveCompanyMutation.isPending} w="fit-content">
+            Save profile
+          </Button>
+        </Group>
       </Stack>
     </Card>
   );

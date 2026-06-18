@@ -35,13 +35,13 @@ type DashboardHomeProps = {
 
 const dashboardCopy = {
   header: {
-    title: "License your content and receive royalties through the RSL Collective",
+    title: "Dashboard",
     badge: "Beta",
-    description: "Create your publisher profile to begin verification."
+    description: "License your content and receive royalties through the RSL Collective."
   },
   gettingStarted: {
     sectionTitle: "Getting started",
-    noProfileHeading: "Create your publisher profile",
+    noProfileHeading: "Create publisher profile",
     noProfileDescription: "Submit your publisher information for RSL Collective verification.",
     noProfileAction: "Create publisher profile",
     submittedHeading: "Publisher profile submitted",
@@ -50,38 +50,37 @@ const dashboardCopy = {
   },
   cards: {
     publisherProfile: {
-      title: "Create and verify your publisher profile",
-      description: "Submit publisher identity, contact, and business information."
+      title: "Create and verify publisher profile",
+      description: "Submit your publisher identity, contact, and business information."
     },
     verification: {
       title: "Complete publisher verification",
-      description: "Verify your publisher account for RSL Collective participation."
+      description: "Verify your profile information for RSL Collective participation."
+    },
+    licensingTerms: {
+      title: "Review licensing terms",
+      description: "Review and agree to the RSL Collective licensing terms."
     }
   },
   modules: [
     {
-      title: "Define your licensable content repertoire",
-      description: "Identify the content included in RSL Collective licensing.",
+      title: "Define licensable content",
+      description: "Identify the content you want to license through the RSL Collective licensing.",
       icon: Library
     },
     {
       title: "Manage licensee exclusions",
-      description: "Exclude specific licensees or licensee categories.",
+      description: "Exclude specific licensees from accessing your licensable content.",
       icon: Ban
     },
     {
       title: "View licensing and settlement reports",
-      description: "Review usage, licensing, settlement, and royalty reports.",
+      description: "Review your usage, licensing, settlement, and royalty reports.",
       icon: BarChart3
     },
     {
-      title: "Manage publisher enrollment",
-      description: "Activate publisher participation in RSL Collective licensing.",
-      icon: ClipboardCheck
-    },
-    {
       title: "Set up royalty payments",
-      description: "Configure payment details for royalty distributions.",
+      description: "Configure your payment details for receiving royalty payments distributions.",
       icon: CreditCard
     }
   ]
@@ -119,26 +118,21 @@ export function DashboardHome({
 
       {!isLoadingCompany && !hasCompany ? (
         <Card withBorder radius="sm" p="md">
-          <Group justify="space-between" align="flex-start" gap="lg" wrap="wrap">
-            <Group gap="md" align="flex-start" wrap="nowrap">
-              <ThemeIcon color="blue" variant="light" size="xl" radius="sm">
-                <Building2 size={22} strokeWidth={1.8} />
-              </ThemeIcon>
-              <Stack gap="xs" maw={680}>
-                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  {dashboardCopy.gettingStarted.sectionTitle}
-                </Text>
-                <Title order={2} size="h4">
-                  {dashboardCopy.gettingStarted.noProfileHeading}
-                </Title>
-                <Text size="sm" c="dimmed">
-                  {dashboardCopy.gettingStarted.noProfileDescription}
-                </Text>
-              </Stack>
-            </Group>
-            <Button leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-              {dashboardCopy.gettingStarted.noProfileAction}
-            </Button>
+          <Group gap="md" align="flex-start" wrap="nowrap">
+            <ThemeIcon color="blue" variant="light" size="xl" radius="sm">
+              <Building2 size={22} strokeWidth={1.8} />
+            </ThemeIcon>
+            <Stack gap="xs" maw={680}>
+              <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                {dashboardCopy.gettingStarted.sectionTitle}
+              </Text>
+              <Title order={2} size="h4">
+                {dashboardCopy.gettingStarted.noProfileHeading}
+              </Title>
+              <Text size="sm" c="dimmed">
+                {dashboardCopy.gettingStarted.noProfileDescription}
+              </Text>
+            </Stack>
           </Group>
         </Card>
       ) : null}
@@ -188,7 +182,7 @@ export function DashboardHome({
           color={hasCompany ? "green" : "yellow"}
           action={
             <Button variant="light" size="xs" w="fit-content" onClick={onNavigateToCompany}>
-              {hasCompany ? "Review profile" : "Start profile"}
+              {hasCompany ? "Review profile" : dashboardCopy.gettingStarted.noProfileAction}
             </Button>
           }
         />
@@ -198,6 +192,18 @@ export function DashboardHome({
           description={dashboardCopy.cards.verification.description}
           icon={ShieldCheck}
           color={hasCompany ? "yellow" : "orange"}
+          action={
+            <Button variant="light" size="xs" w="fit-content" disabled>
+              Verify profile
+            </Button>
+          }
+        />
+        <StatusCard
+          title={dashboardCopy.cards.licensingTerms.title}
+          status="Pending verification"
+          description={dashboardCopy.cards.licensingTerms.description}
+          icon={ClipboardCheck}
+          color="gray"
         />
         {dashboardCopy.modules.map((module) => (
           <StatusCard

@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { Alert, Button, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import { LogOut, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { SessionUser } from "../../api/session";
@@ -12,7 +12,7 @@ type AccountTabProps = {
 const accountCopy = {
   dangerTitle: "Danger zone",
   dangerDescription:
-    "Deleting an account may remove access to this dashboard and the publisher profile associated with it.",
+    "Deleting your account is permanent and cannot be undone.",
   deleteButton: "Delete account",
   deleteRequestTitle: "Account deletion request",
   deleteRequestDescription:
@@ -28,11 +28,6 @@ export function AccountTab({ user, onSignOut }: AccountTabProps) {
       <PageHeader
         title="Account Information"
         description="Review the authenticated account associated with this RSL Collective dashboard session."
-        badge={
-          <Badge color={user.hasCompany ? "green" : "yellow"} variant="light">
-            {user.hasCompany ? "Publisher profile complete" : "Publisher profile needed"}
-          </Badge>
-        }
       />
 
       <Card withBorder radius="sm" p="md">
@@ -43,7 +38,7 @@ export function AccountTab({ user, onSignOut }: AccountTabProps) {
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <AccountField label="Email" value={user.email} />
             {fullName ? <AccountField label="Name" value={fullName} /> : null}
-            <AccountField label="Publisher role" value={user.role} textTransform="capitalize" />
+            <AccountField label="Account role" value={user.role} textTransform="capitalize" />
             <AccountField
               label="Publisher profile"
               value={user.hasCompany ? "Exists" : "Not created"}

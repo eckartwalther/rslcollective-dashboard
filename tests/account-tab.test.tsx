@@ -50,10 +50,11 @@ describe("AccountTab", () => {
     expect(screen.getByText("jane@example.com")).toBeInTheDocument();
   });
 
-  it("displays publisher role", () => {
+  it("displays account role", () => {
     renderAccountTab();
 
-    expect(screen.getByText("Publisher role")).toBeInTheDocument();
+    expect(screen.getByText("Account role")).toBeInTheDocument();
+    expect(screen.queryByText("Publisher role")).not.toBeInTheDocument();
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
@@ -62,6 +63,7 @@ describe("AccountTab", () => {
 
     expect(screen.getByText("Publisher profile")).toBeInTheDocument();
     expect(screen.getByText("Exists")).toBeInTheDocument();
+    expect(screen.queryByText("Publisher profile complete")).not.toBeInTheDocument();
 
     renderAccountTab({
       ...userWithCompany,
@@ -70,6 +72,7 @@ describe("AccountTab", () => {
     });
 
     expect(screen.getByText("Not created")).toBeInTheDocument();
+    expect(screen.queryByText("Publisher profile needed")).not.toBeInTheDocument();
   });
 
   it("calls the sign-out handler", () => {
@@ -84,7 +87,7 @@ describe("AccountTab", () => {
     renderAccountTab();
 
     expect(screen.getByText("Danger zone")).toBeInTheDocument();
-    expect(screen.getByText(/publisher profile associated with it/i)).toBeInTheDocument();
+    expect(screen.getByText("Deleting your account is permanent and cannot be undone.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete account/i })).toBeInTheDocument();
   });
 
