@@ -14,6 +14,13 @@ const env = {
   DB: {} as D1Database
 };
 
+const localEnv = {
+  ...env,
+  WORKOS_REDIRECT_URI: "https://dashboard.rslcollective.org/auth/callback",
+  DASHBOARD_BASE_URL: "http://localhost:8787",
+  ENVIRONMENT: "development"
+};
+
 async function getRedirect(path: string) {
   const response = await authRoutes.fetch(
     new Request(`https://dashboard.rslcollective.org${path}`),
@@ -62,6 +69,21 @@ describe("AuthKit authorization routes", () => {
     );
   });
 
+  it("uses DASHBOARD_BASE_URL for local development WorkOS redirect URI", async () => {
+    const response = await authRoutes.fetch(new Request("http://localhost:8787/login"), localEnv);
+    const location = response.headers.get("Location");
+
+    if (!location) {
+      throw new Error("Missing Location header.");
+    }
+
+    const url = new URL(location);
+
+    expect(response.status).toBe(302);
+    expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:8787/auth/callback");
+    expect(url.toString()).not.toContain("dashboard.rslcollective.org/auth/callback");
+  });
+
   it("includes signed state that validates when untampered", async () => {
     const { url } = await getRedirect("/login?returnTo=/dashboard/profile");
     const state = url.searchParams.get("state");
@@ -75,6 +97,25 @@ describe("AuthKit authorization routes", () => {
     expect(result.valid && result.payload.returnTo).toBe("/dashboard/profile");
     expect(result.valid && result.payload.nonce).toEqual(expect.any(String));
     expect(result.valid && result.payload.iat).toEqual(expect.any(Number));
+  });
+
+  it("preserves local returnTo as a relative path in signed state", async () => {
+    const response = await authRoutes.fetch(
+      new Request("http://localhost:8787/login?returnTo=/dashboard/company"),
+      localEnv
+    );
+    const location = response.headers.get("Location");
+
+    if (!location) {
+      throw new Error("Missing Location header.");
+    }
+
+    const state = new URL(location).searchParams.get("state");
+    const result = await validateSignedAuthState(state, localEnv.SESSION_SECRET);
+
+    expect(result.valid).toBe(true);
+    expect(result.valid && result.payload.returnTo).toBe("/dashboard/company");
+    expect(JSON.stringify(result)).not.toContain("dashboard.rslcollective.org/dashboard/company");
   });
 
   it("rejects malformed state", async () => {

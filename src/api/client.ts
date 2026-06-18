@@ -28,10 +28,14 @@ export async function apiJson<T>(path: string, init: RequestInit = {}) {
 }
 
 export function apiRequest(path: string, init: RequestInit = {}) {
-  return fetch(path, {
+  const requestInit = {
     credentials: "include",
     ...init
-  });
+  } satisfies RequestInit;
+
+  logFrontendApiRequest(path, requestInit);
+
+  return fetch(path, requestInit);
 }
 
 export async function readJsonBody(response: Response) {
@@ -56,4 +60,35 @@ function apiErrorMessage(body: unknown, response: Response) {
   }
 
   return `Request failed with status ${response.status}.`;
+}
+
+function logFrontendApiRequest(path: string, init: RequestInit) {
+  if (!isFrontendApiDiagnosticsEnabled()) {
+    return;
+  }
+
+  console.info({
+    event: "frontend_api_request",
+    method: init.method ?? "GET",
+    url: path,
+    locationHref: window.location.href,
+    locationOrigin: window.location.origin,
+    locationHost: window.location.host
+  });
+}
+
+function isFrontendApiDiagnosticsEnabled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (import.meta.env.MODE === "test") {
+    return false;
+  }
+
+  return import.meta.env.DEV || isLocalBrowserHost(window.location.hostname);
+}
+
+function isLocalBrowserHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }

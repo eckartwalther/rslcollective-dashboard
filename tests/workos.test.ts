@@ -7,7 +7,11 @@ vi.mock("@workos-inc/node/worker", () => ({
   WorkOS: workosMock.WorkOS
 }));
 
-import { exchangeWorkosAuthorizationCode } from "../worker/lib/workos";
+import {
+  exchangeWorkosAuthorizationCode,
+  getWorkosAuthorizationUrl,
+  getWorkosRedirectUri
+} from "../worker/lib/workos";
 
 const env = {
   WORKOS_CLIENT_ID: "client_1234567890abcdef",
@@ -129,5 +133,37 @@ describe("WorkOS helper", () => {
     ).rejects.toThrow("WorkOS authorization code exchange failed.");
 
     expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("uses DASHBOARD_BASE_URL for authorization callback URI outside production", async () => {
+    const redirectUri = getWorkosRedirectUri({
+      ...env,
+      ENVIRONMENT: "development",
+      DASHBOARD_BASE_URL: "http://localhost:8787"
+    });
+    const authorizationUrl = new URL(
+      await getWorkosAuthorizationUrl(
+        {
+          ...env,
+          ENVIRONMENT: "development",
+          DASHBOARD_BASE_URL: "http://localhost:8787"
+        },
+        { flow: "login", returnTo: "/dashboard/company" }
+      )
+    );
+
+    expect(redirectUri).toBe("http://localhost:8787/auth/callback");
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+      "http://localhost:8787/auth/callback"
+    );
+    expect(authorizationUrl.toString()).not.toContain(
+      "dashboard.rslcollective.org/auth/callback"
+    );
+  });
+
+  it("uses configured WORKOS_REDIRECT_URI in production", async () => {
+    expect(getWorkosRedirectUri({ ...env, ENVIRONMENT: "production" })).toBe(
+      "https://dashboard.rslcollective.org/auth/callback"
+    );
   });
 });

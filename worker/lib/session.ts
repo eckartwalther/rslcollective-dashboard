@@ -172,9 +172,9 @@ export function normalizeReturnTo(returnTo: string) {
   }
 
   try {
-    const parsed = new URL(returnTo, "https://dashboard.rslcollective.org");
+    const parsed = new URL(returnTo, "http://localhost");
 
-    if (parsed.origin !== "https://dashboard.rslcollective.org") {
+    if (parsed.origin !== "http://localhost") {
       return null;
     }
 

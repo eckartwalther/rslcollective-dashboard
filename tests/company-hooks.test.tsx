@@ -129,6 +129,21 @@ describe("company API hooks", () => {
         })
       );
     });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).has("Origin")).toBe(false);
+  });
+
+  it("saveCompany uses relative /api/company and does not set Origin", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ company: existingCompany }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveCompany({ legalName: "Example Media Inc." });
+
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+
+    expect(path).toBe("/api/company");
+    expect(init.method).toBe("PUT");
+    expect(new Headers(init.headers).has("Origin")).toBe(false);
   });
 
   it("invalidates the company query after save success", async () => {

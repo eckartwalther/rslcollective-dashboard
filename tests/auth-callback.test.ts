@@ -19,6 +19,13 @@ const env = {
   DB: {} as D1Database
 };
 
+const localEnv = {
+  ...env,
+  WORKOS_REDIRECT_URI: "https://dashboard.rslcollective.org/auth/callback",
+  DASHBOARD_BASE_URL: "http://localhost:8787",
+  ENVIRONMENT: "development"
+};
+
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_local",
@@ -139,12 +146,24 @@ function callbackUrl(params: URLSearchParams) {
   return `https://dashboard.rslcollective.org/auth/callback?${params.toString()}`;
 }
 
+function localCallbackUrl(params: URLSearchParams) {
+  return `http://localhost:8787/auth/callback?${params.toString()}`;
+}
+
 async function callbackRequest(
   routes: ReturnType<typeof createAuthRoutes>,
   params: URLSearchParams,
   requestEnv = env
 ) {
   return routes.fetch(new Request(callbackUrl(params)), requestEnv);
+}
+
+async function localCallbackRequest(
+  routes: ReturnType<typeof createAuthRoutes>,
+  params: URLSearchParams,
+  requestEnv = localEnv
+) {
+  return routes.fetch(new Request(localCallbackUrl(params)), requestEnv);
 }
 
 describe("AuthKit callback", () => {
@@ -318,6 +337,42 @@ describe("AuthKit callback", () => {
     expect(cookie).toContain("SameSite=Lax");
     expect(cookie).toContain("Path=/");
     expect(cookie).not.toContain("Domain=");
+  });
+
+  it("redirects local callback success to relative /dashboard", async () => {
+    const { routes } = createHarness();
+    const response = await localCallbackRequest(
+      routes,
+      new URLSearchParams({
+        code: "code_valid",
+        state: await signedState({
+          flow: "login",
+          secret: localEnv.SESSION_SECRET
+        })
+      })
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/dashboard");
+  });
+
+  it("redirects local callback success to a relative returnTo path", async () => {
+    const { routes } = createHarness();
+    const response = await localCallbackRequest(
+      routes,
+      new URLSearchParams({
+        code: "code_valid",
+        state: await signedState({
+          flow: "login",
+          secret: localEnv.SESSION_SECRET,
+          returnTo: "/dashboard/company"
+        })
+      })
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/dashboard/company");
+    expect(response.headers.get("Location")).not.toContain("dashboard.rslcollective.org");
   });
 
   it("redirects root to /login when unauthenticated", async () => {

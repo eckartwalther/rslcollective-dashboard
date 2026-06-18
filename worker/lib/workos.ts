@@ -23,6 +23,11 @@ export async function getWorkosAuthorizationUrl(
   options: WorkosAuthorizationUrlOptions
 ) {
   assertWorkosAuthConfig(env);
+  const redirectUri = getWorkosRedirectUri(env);
+
+  if (!redirectUri) {
+    throw new Error("WorkOS authorization is not configured.");
+  }
 
   let returnTo: string | undefined;
 
@@ -45,7 +50,7 @@ export async function getWorkosAuthorizationUrl(
 
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", env.WORKOS_CLIENT_ID);
-  url.searchParams.set("redirect_uri", env.WORKOS_REDIRECT_URI);
+  url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("provider", "authkit");
   url.searchParams.set("screen_hint", options.flow === "register" ? "sign-up" : "sign-in");
   url.searchParams.set("state", state);
@@ -57,12 +62,19 @@ export function assertWorkosAuthConfig(
   env: WorkosAuthEnv
 ): asserts env is WorkosAuthEnv & {
   WORKOS_CLIENT_ID: string;
-  WORKOS_REDIRECT_URI: string;
   SESSION_SECRET: string;
 } {
-  if (!env.WORKOS_CLIENT_ID || !env.WORKOS_REDIRECT_URI || !env.SESSION_SECRET) {
+  if (!env.WORKOS_CLIENT_ID || !env.SESSION_SECRET || !getWorkosRedirectUri(env)) {
     throw new Error("WorkOS authorization is not configured.");
   }
+}
+
+export function getWorkosRedirectUri(env: WorkosAuthEnv) {
+  if (env.ENVIRONMENT !== "production" && env.DASHBOARD_BASE_URL) {
+    return buildUrl(env.DASHBOARD_BASE_URL, "/auth/callback");
+  }
+
+  return env.WORKOS_REDIRECT_URI ?? null;
 }
 
 export type WorkosAuthenticatedUser = {
@@ -114,6 +126,14 @@ export function getWorkosLogoutUrl(env: WorkosAuthEnv) {
   url.searchParams.set("return_to", returnTo);
 
   return url.toString();
+}
+
+function buildUrl(baseUrl: string, path: string) {
+  try {
+    return new URL(path, baseUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 function mapWorkosAuthenticateResponse(response: AuthenticationResponse): WorkosAuthenticatedUser {

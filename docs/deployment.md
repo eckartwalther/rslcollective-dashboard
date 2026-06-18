@@ -111,7 +111,7 @@ DASHBOARD_BASE_URL=http://localhost:8787
 ENVIRONMENT=development
 ```
 
-For local development, `ENVIRONMENT` may also be omitted because development is the default behavior.
+For local development, `ENVIRONMENT` may also be omitted because development is the default behavior. Development Origin validation accepts `DASHBOARD_BASE_URL` when configured and local Worker origins on `localhost` or `127.0.0.1` using HTTP or HTTPS on ports `8787` and `8788`. Production still requires the request `Origin` to match `DASHBOARD_BASE_URL`.
 
 Secret setup command patterns:
 

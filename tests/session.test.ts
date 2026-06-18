@@ -4,6 +4,7 @@ import {
   createSessionCookie,
   deleteSessionFromRequest,
   hashSessionToken,
+  normalizeReturnTo,
   SESSION_COOKIE_NAME,
   type SessionStore
 } from "../worker/lib/session";
@@ -151,6 +152,14 @@ describe("session utilities", () => {
     });
 
     expect(cookie).toContain("Secure");
+  });
+
+  it("normalizes returnTo paths without using the production dashboard host", () => {
+    expect(normalizeReturnTo("/dashboard/company?tab=profile#top")).toBe(
+      "/dashboard/company?tab=profile#top"
+    );
+    expect(normalizeReturnTo("https://dashboard.rslcollective.org/dashboard/company")).toBeNull();
+    expect(normalizeReturnTo("//dashboard.rslcollective.org/dashboard/company")).toBeNull();
   });
 
   it("deletes sessions and returns a clearing cookie", async () => {

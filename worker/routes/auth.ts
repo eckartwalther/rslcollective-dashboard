@@ -166,7 +166,7 @@ async function handleAuthCallback(c: Context<{ Bindings: Bindings }>, deps: Auth
 
   c.header("Set-Cookie", session.cookie);
 
-  return c.redirect("/dashboard");
+  return c.redirect(stateResult.payload.returnTo ?? "/dashboard");
 }
 
 async function buildAuthorizationRedirect(
