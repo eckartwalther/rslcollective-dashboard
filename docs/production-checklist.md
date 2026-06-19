@@ -5,7 +5,7 @@ Use this checklist when moving the RSL Collective Profile Application from local
 ## 1. Cloudflare Account And D1 Setup
 
 - Confirm the target Cloudflare account controls `rslcollective.org` and `dashboard.rslcollective.org`.
-- Replace the placeholders in `wrangler.production.jsonc`:
+- Confirm or replace the production account and D1 values in `wrangler.production.jsonc`:
   - `account_id`: Cloudflare account ID for the `rslcollective.org` account.
   - `d1_databases[0].database_id`: production D1 database ID from the same account.
 - Keep `wrangler.jsonc` local/dev-safe. It must not contain a production `routes` or `custom_domain` entry.
@@ -14,6 +14,7 @@ Use this checklist when moving the RSL Collective Profile Application from local
   - Workers Assets binding name `ASSETS`.
   - `not_found_handling: "single-page-application"`.
   - `run_worker_first` entries for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
+  - Production vars for `WORKOS_REDIRECT_URI`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT`.
   - Custom-domain route for `dashboard.rslcollective.org`.
 - Create the production D1 database if it does not already exist:
 
@@ -27,15 +28,17 @@ pnpm exec wrangler d1 create rsl-collective-dashboard --config wrangler.producti
 ## 2. WorkOS Production AuthKit Setup
 
 - Use the WorkOS Production environment, not Staging.
+- Use WorkOS default hosted AuthKit for the first production deploy.
+- Use the default WorkOS email sender for the first production deploy.
+- Use the WorkOS Production Client ID and API Key.
 - Configure AuthKit for the production dashboard:
   - Callback URL: `https://dashboard.rslcollective.org/auth/callback`
   - Sign-in endpoint: `https://dashboard.rslcollective.org/login`
   - Logout/sign-out return URL: `https://dashboard.rslcollective.org/login`
-- Configure AuthKit custom domain:
-  - `login.rslcollective.org`
-  - If DNS is managed in Cloudflare, keep the WorkOS custom-domain CNAME DNS-only, not proxied.
-- Configure and verify the email domain:
-  - `no-reply@mail.rslcollective.org`
+  - App homepage: `https://dashboard.rslcollective.org/`
+- Do not configure a custom AuthKit domain for the first production deploy.
+- Do not configure a custom WorkOS email sender/domain for the first production deploy.
+- Custom AuthKit domain `login.rslcollective.org` and custom email sender/domain `no-reply@mail.rslcollective.org` are optional future branding steps.
 - Do not enable WorkOS Organizations for this phase.
 
 ## 3. Worker Secrets And Runtime Variables
@@ -55,10 +58,11 @@ Secrets:
 
 - `WORKOS_API_KEY`
 - `SESSION_SECRET`
-- `WORKOS_CLIENT_ID` may be stored as a secret for consistency, although it is not as sensitive as the API key.
+- `WORKOS_CLIENT_ID` may be stored as a secret, but prefer a non-secret Worker variable unless there is a reason to hide it.
 
 Non-secret runtime variables:
 
+- `WORKOS_CLIENT_ID=<WorkOS Production Client ID>`, preferred unless managed as a secret
 - `WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback`
 - `DASHBOARD_BASE_URL=https://dashboard.rslcollective.org`
 - `ENVIRONMENT=production`
@@ -68,14 +72,14 @@ Non-secret runtime variables:
 Set production secrets and variables before deploy:
 
 ```sh
-pnpm exec wrangler secret put WORKOS_CLIENT_ID --config wrangler.production.jsonc
 pnpm exec wrangler secret put WORKOS_API_KEY --config wrangler.production.jsonc
 pnpm exec wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
 ```
 
-Set non-secret production variables in Cloudflare Worker settings, or add them under a production-specific Wrangler variables strategy if the project later adopts named environments:
+`WORKOS_REDIRECT_URI`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT` are already set in `wrangler.production.jsonc`. Set `WORKOS_CLIENT_ID` as a production Worker variable in Cloudflare Worker settings, or as a secret if the team chooses to hide it:
 
 ```txt
+WORKOS_CLIENT_ID=<WorkOS Production Client ID>
 WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback
 DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
 ENVIRONMENT=production

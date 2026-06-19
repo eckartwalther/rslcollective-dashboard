@@ -347,12 +347,13 @@ Use WorkOS AuthKit hosted authentication.
 Production configuration:
 
 ```txt
-AuthKit domain: login.rslcollective.org
-Email sender: no-reply@mail.rslcollective.org
+AuthKit domain: WorkOS default hosted AuthKit for initial production deploy
+Email sender: WorkOS default email sender for initial production deploy
 Dashboard/app domain: dashboard.rslcollective.org
 Callback URL: https://dashboard.rslcollective.org/auth/callback
 Sign-in endpoint: https://dashboard.rslcollective.org/login
-Sign-out redirect: https://dashboard.rslcollective.org/
+Sign-out redirect: https://dashboard.rslcollective.org/login
+App homepage: https://dashboard.rslcollective.org/
 ```
 
 Local callback:
@@ -381,11 +382,13 @@ Auth rules:
 
 ### 8.1 WorkOS custom domain and email domain
 
-`login.rslcollective.org` must be configured as a WorkOS AuthKit custom domain.
+The first production deploy uses WorkOS default hosted AuthKit and the default WorkOS email sender.
 
-In Cloudflare DNS, the CNAME for the AuthKit custom domain must be DNS-only, not proxied.
+`login.rslcollective.org` may be configured later as an optional WorkOS AuthKit custom domain for branding.
 
-The email sender `no-reply@mail.rslcollective.org` requires the WorkOS email domain to be configured and verified before production launch.
+The email sender `no-reply@mail.rslcollective.org` may be configured later as an optional custom WorkOS email sender/domain for branding.
+
+If those optional custom domains are added later and DNS is managed in Cloudflare, their WorkOS CNAME records must be DNS-only, not proxied.
 
 ### 8.2 Worker runtime and SDK compatibility
 
@@ -1100,10 +1103,10 @@ Suggested scripts:
     "build": "vite build",
     "test": "vitest",
     "check": "tsc --noEmit",
-    "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 migrations apply rsl-collective-dashboard --local",
-    "db:migrate:remote": "wrangler d1 migrations apply rsl-collective-dashboard --remote"
+    "worker:dev": "wrangler dev --config wrangler.jsonc",
+    "worker:deploy": "wrangler deploy --config wrangler.production.jsonc",
+    "db:migrate:local": "wrangler d1 migrations apply rsl-collective-dashboard --local --config wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply rsl-collective-dashboard --remote --config wrangler.production.jsonc"
   }
 }
 ```
@@ -1161,6 +1164,7 @@ WORKOS_API_KEY
 WORKOS_REDIRECT_URI
 SESSION_SECRET
 DASHBOARD_BASE_URL
+ENVIRONMENT
 ```
 
 D1 binding:
@@ -1178,6 +1182,7 @@ Production examples:
 ```txt
 WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback
 DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
+ENVIRONMENT=production
 ```
 
 Local examples:
