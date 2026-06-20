@@ -19,7 +19,6 @@ import {
   BookOpenCheck,
   Building2,
   ClipboardCheck,
-  ExternalLink,
   Globe2,
   LayoutDashboard,
   Library,
@@ -213,14 +212,16 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               component="a"
               data-testid="dashboard-help-navigation"
               href="/dashboard/onboarding"
-              target="_blank"
-              rel="noopener noreferrer"
               label="Onboarding Guide"
-              aria-label="Onboarding Guide opens in a new tab"
+              aria-label="Onboarding Guide"
               leftSection={<BookOpenCheck size={16} strokeWidth={1.8} />}
-              rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
               active={activeView === "onboarding"}
               color={theme.primaryColor}
+              onClick={(event) => {
+                event.preventDefault();
+                navigateToView("onboarding");
+                close();
+              }}
               styles={{
                 root: {
                   borderRadius: 6,
@@ -255,6 +256,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               isLoadingCompany={companyQuery.isLoading || companyQuery.isFetching}
               isCompanyError={companyQuery.isError}
               onNavigateToCompany={() => navigateToView("company")}
+              onNavigateToOnboarding={() => navigateToView("onboarding")}
             />
           ) : null}
           {activeView === "onboarding" ? (

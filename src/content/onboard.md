@@ -4,7 +4,7 @@ outline: [2,3]
 lastUpdated: true
 ---
 
-# Publisher Onboarding Guide
+# Onboarding Guide
 
 This guide helps publishers prepare their content for licensing through the RSL Collective, either through an Enrollment Partner or directly through the RSL Collective API.
 

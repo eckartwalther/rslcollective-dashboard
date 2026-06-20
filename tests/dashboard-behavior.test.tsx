@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AppProviders } from "../src/app/providers";
 import { DashboardPage } from "../src/pages/DashboardPage";
 import type { SessionResponse } from "../src/api/session";
@@ -252,9 +252,9 @@ describe("dashboard behavior", () => {
     ]);
     expect(onboardingLink).toHaveAttribute("data-testid", "dashboard-help-navigation");
     expect(onboardingLink).toHaveAttribute("href", "/dashboard/onboarding");
-    expect(onboardingLink).toHaveAttribute("target", "_blank");
-    expect(onboardingLink).toHaveAttribute("rel", "noopener noreferrer");
-    expect(within(onboardingLink).getByLabelText("Opens in a new tab")).toBeInTheDocument();
+    expect(onboardingLink).not.toHaveAttribute("target");
+    expect(onboardingLink).not.toHaveAttribute("rel");
+    expect(onboardingLink).not.toHaveTextContent("Opens in a new tab");
     expect(divider.previousElementSibling).toBe(settingsButton);
     expect(divider.nextElementSibling).toBe(onboardingLink);
     expect(
@@ -376,7 +376,7 @@ describe("dashboard behavior", () => {
     renderDashboard();
 
     expect(
-      await screen.findByRole("heading", { name: "Publisher Guide for RSL Collective Licensing" })
+      await screen.findByRole("heading", { name: "Publisher Onboarding Guide" })
     ).toBeInTheDocument();
     expect(screen.getByTestId("onboarding-doc-layout")).toBeInTheDocument();
     expect(screen.getByTestId("onboarding-article-body")).toBeInTheDocument();
@@ -397,7 +397,7 @@ describe("dashboard behavior", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Step 4: Readiness checklist" })).toBeInTheDocument();
     expect(screen.getAllByText(/https:\/\/rslcollective\.org\/license/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Last updated: June 7, 2026")).toBeInTheDocument();
+    expect(screen.queryByText(/^Last updated:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/lastUpdated:\s*true/)).not.toBeInTheDocument();
     expect(screen.queryByText(/outline:\s*\[2,3\]/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\{2\}/)).not.toBeInTheDocument();
@@ -431,9 +431,13 @@ describe("dashboard behavior", () => {
     const link = await screen.findByRole("link", { name: /Read onboarding guide/i });
 
     expect(link).toHaveAttribute("href", "/dashboard/onboarding");
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
-    expect(within(link).getByLabelText("Opens in a new tab")).toBeInTheDocument();
+    expect(link).not.toHaveAttribute("target");
+    expect(link).not.toHaveAttribute("rel");
+    expect(link).not.toHaveTextContent("Opens in a new tab");
+
+    fireEvent.click(link);
+
+    expect(window.location.pathname).toBe("/dashboard/onboarding");
   });
 
   it("renders /dashboard/onboarding as an authenticated static dashboard view", async () => {
@@ -443,7 +447,7 @@ describe("dashboard behavior", () => {
     renderDashboard();
 
     expect(
-      await screen.findByRole("heading", { name: "Publisher Guide for RSL Collective Licensing" })
+      await screen.findByRole("heading", { name: "Publisher Onboarding Guide" })
     ).toBeInTheDocument();
     expect(
       screen.getByText(

@@ -17,7 +17,6 @@ import {
   Building2,
   ClipboardCheck,
   CreditCard,
-  ExternalLink,
   Library,
   ShieldCheck
 } from "lucide-react";
@@ -34,6 +33,7 @@ type DashboardHomeProps = {
   isLoadingCompany: boolean;
   isCompanyError: boolean;
   onNavigateToCompany: () => void;
+  onNavigateToOnboarding: () => void;
 };
 
 const dashboardCopy = {
@@ -102,7 +102,8 @@ export function DashboardHome({
   company,
   isLoadingCompany,
   isCompanyError,
-  onNavigateToCompany
+  onNavigateToCompany,
+  onNavigateToOnboarding
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
 
@@ -159,12 +160,13 @@ export function DashboardHome({
               <Button
                 component="a"
                 href="/dashboard/onboarding"
-                target="_blank"
-                rel="noopener noreferrer"
                 variant="subtle"
                 w="fit-content"
                 leftSection={<BookOpenCheck size={16} />}
-                rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onNavigateToOnboarding();
+                }}
               >
                 Read onboarding guide
               </Button>
@@ -205,11 +207,12 @@ export function DashboardHome({
                 <Button
                   component="a"
                   href="/dashboard/onboarding"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   variant="subtle"
                   leftSection={<BookOpenCheck size={16} />}
-                  rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onNavigateToOnboarding();
+                  }}
                 >
                   Read onboarding guide
                 </Button>
