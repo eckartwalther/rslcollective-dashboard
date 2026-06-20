@@ -339,7 +339,7 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<DashboardPage />);
 
     expect(
-      await screen.findByRole("heading", { name: "Define publisher profile" })
+      await screen.findByRole("heading", { name: "Create publisher profile" })
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Publisher Profile/i }));

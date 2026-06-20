@@ -170,15 +170,35 @@ async function localCallbackRequest(
   return routes.fetch(new Request(localCallbackUrl(params)), requestEnv);
 }
 
+async function expectAuthErrorPage(
+  response: Response,
+  expectedTitle: string,
+  forbiddenValues: string[] = []
+) {
+  const body = await response.text();
+
+  expect(response.status).toBeGreaterThanOrEqual(400);
+  expect(response.headers.get("Content-Type")).toContain("text/html");
+  expect(body).toContain(expectedTitle);
+  expect(body).toContain("Sign in again");
+  expect(body).toContain('href="/login"');
+  expect(body).toContain("Create an account");
+  expect(body).toContain('href="/register"');
+  expect(body).not.toContain("validation_error");
+  expect(body).not.toContain('"error"');
+  expect(body).not.toContain('"fields"');
+
+  for (const value of forbiddenValues) {
+    expect(body).not.toContain(value);
+  }
+}
+
 describe("AuthKit callback", () => {
   it("rejects missing state", async () => {
     const { routes } = createHarness();
     const response = await callbackRequest(routes, new URLSearchParams({ code: "code_test" }));
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { state: "missing" } }
-    });
+    await expectAuthErrorPage(response, "Sign-in link expired", ["code_test"]);
   });
 
   it("rejects malformed state", async () => {
@@ -188,10 +208,7 @@ describe("AuthKit callback", () => {
       new URLSearchParams({ code: "code_test", state: "malformed" })
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { state: "malformed" } }
-    });
+    await expectAuthErrorPage(response, "Sign-in link expired", ["code_test", "malformed"]);
   });
 
   it("rejects tampered state", async () => {
@@ -202,10 +219,7 @@ describe("AuthKit callback", () => {
       new URLSearchParams({ code: "code_test", state })
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { state: "tampered" } }
-    });
+    await expectAuthErrorPage(response, "Sign-in link expired", ["code_test", state]);
   });
 
   it("rejects expired state", async () => {
@@ -220,10 +234,7 @@ describe("AuthKit callback", () => {
       new URLSearchParams({ code: "code_test", state })
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { state: "expired" } }
-    });
+    await expectAuthErrorPage(response, "Sign-in link expired", ["code_test", state]);
   });
 
   it("rejects unsupported flow", async () => {
@@ -237,23 +248,18 @@ describe("AuthKit callback", () => {
       new URLSearchParams({ code: "code_test", state })
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { state: "unsupported_flow" } }
-    });
+    await expectAuthErrorPage(response, "Sign-in link expired", ["code_test", state]);
   });
 
   it("rejects missing authorization code", async () => {
     const { routes } = createHarness();
+    const state = await signedState();
     const response = await callbackRequest(
       routes,
-      new URLSearchParams({ state: await signedState() })
+      new URLSearchParams({ state })
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      error: { code: "validation_error", fields: { code: "missing" } }
-    });
+    await expectAuthErrorPage(response, "Authentication could not be completed", [state]);
   });
 
   it("exchanges a valid code through the WorkOS helper", async () => {

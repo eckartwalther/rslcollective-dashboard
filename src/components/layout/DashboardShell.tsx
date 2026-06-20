@@ -2,6 +2,7 @@ import {
   AppShell,
   Burger,
   Button,
+  Divider,
   Group,
   Image,
   NavLink,
@@ -15,22 +16,34 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   Ban,
   BarChart3,
+  BookOpenCheck,
   Building2,
+  ClipboardCheck,
+  ExternalLink,
+  Globe2,
   LayoutDashboard,
   Library,
   LogOut,
   Settings,
+  ShieldCheck,
   UserRound
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SessionUser } from "../../api/session";
 import { useCompanyQuery } from "../../api/company";
 import { AccountTab } from "../dashboard/AccountTab";
 import { CompanyProfileTab } from "../dashboard/CompanyProfileTab";
 import { DashboardHome } from "../dashboard/DashboardHome";
+import { LoadingState } from "./LoadingState";
 
-type DashboardView = "dashboard" | "company" | "account";
+const OnboardingGuide = lazy(() =>
+  import("../dashboard/OnboardingGuide").then((module) => ({
+    default: module.OnboardingGuide
+  }))
+);
+
+type DashboardView = "dashboard" | "company" | "account" | "onboarding";
 
 type DashboardShellProps = {
   user: SessionUser;
@@ -48,10 +61,14 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { label: "Dashboard", view: "dashboard", icon: LayoutDashboard },
   { label: "Publisher Profile", view: "company", icon: Building2 },
-  { label: "Account Information", view: "account", icon: UserRound },
+  { label: "Publisher Verification", icon: ShieldCheck, disabled: true, disabledReason: "Available after RSL Collective approval" },
   { label: "Repertoire", icon: Library, disabled: true, disabledReason: "Available after RSL Collective approval" },
   { label: "Licensee Exclusions", icon: Ban, disabled: true, disabledReason: "Available after RSL Collective approval" },
   { label: "Reporting", icon: BarChart3, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Enrollment", icon: Globe2, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Licensing Payments", icon: ClipboardCheck, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Review Licensing Terms", icon: ClipboardCheck, disabled: true, disabledReason: "Available after RSL Collective approval" },
+  { label: "Account Information", view: "account", icon: UserRound },
   { label: "Settings", icon: Settings, disabled: true, disabledReason: "Available after RSL Collective approval" }
 ];
 
@@ -81,6 +98,10 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
       return "Account Information";
     }
 
+    if (activeView === "onboarding") {
+      return "Onboarding Guide";
+    }
+
     return "Dashboard";
   }, [activeView]);
 
@@ -93,7 +114,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
         collapsed: { mobile: !opened }
       }}
       padding="lg"
-      bg="gray.0"
+      bg={activeView === "onboarding" ? "white" : "gray.0"}
     >
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
@@ -146,7 +167,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
             </Text>
           </Stack>
 
-          <Stack gap="xs">
+          <Stack gap="xs" data-testid="dashboard-navigation">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const active = Boolean(item.view && item.view === activeView);
@@ -186,15 +207,47 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
                 />
               );
             })}
+
+            <Divider data-testid="onboarding-guide-divider" />
+            <NavLink
+              component="a"
+              data-testid="dashboard-help-navigation"
+              href="/dashboard/onboarding"
+              target="_blank"
+              rel="noopener noreferrer"
+              label="Onboarding Guide"
+              aria-label="Onboarding Guide opens in a new tab"
+              leftSection={<BookOpenCheck size={16} strokeWidth={1.8} />}
+              rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
+              active={activeView === "onboarding"}
+              color={theme.primaryColor}
+              styles={{
+                root: {
+                  borderRadius: 6,
+                  minHeight: 34
+                },
+                label: {
+                  fontSize: 14
+                },
+                section: {
+                  color:
+                    activeView === "onboarding"
+                      ? `var(--mantine-color-${theme.primaryColor}-7)`
+                      : "var(--mantine-color-gray-6)"
+                }
+              }}
+            />
           </Stack>
         </Stack>
       </AppShell.Navbar>
 
       <AppShell.Main>
         <Stack gap="lg" maw={1120}>
-          <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-            {activeTitle}
-          </Text>
+          {activeView !== "onboarding" ? (
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+              {activeTitle}
+            </Text>
+          ) : null}
           {activeView === "dashboard" ? (
             <DashboardHome
               user={user}
@@ -203,6 +256,11 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               isCompanyError={companyQuery.isError}
               onNavigateToCompany={() => navigateToView("company")}
             />
+          ) : null}
+          {activeView === "onboarding" ? (
+            <Suspense fallback={<LoadingState rows={6} />}>
+              <OnboardingGuide />
+            </Suspense>
           ) : null}
           {activeView === "company" ? <CompanyProfileTab authenticated /> : null}
           {activeView === "account" ? <AccountTab user={user} onSignOut={onSignOut} /> : null}
@@ -222,6 +280,10 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
 }
 
 function viewFromPathname(): DashboardView {
+  if (window.location.pathname.endsWith("/onboarding")) {
+    return "onboarding";
+  }
+
   if (window.location.pathname.endsWith("/company")) {
     return "company";
   }
@@ -240,6 +302,10 @@ function pathForView(view: DashboardView) {
 
   if (view === "account") {
     return "/dashboard/account";
+  }
+
+  if (view === "onboarding") {
+    return "/dashboard/onboarding";
   }
 
   return "/dashboard";

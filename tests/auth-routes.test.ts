@@ -208,12 +208,12 @@ describe("AuthKit authorization routes", () => {
       env
     );
     expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      error: {
-        code: "validation_error"
-      }
-    });
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    const body = await response.text();
+    expect(body).toContain("Authentication could not be completed");
+    expect(body).toContain('href="/login"');
+    expect(body).toContain('href="/register"');
+    expect(body).not.toContain("evil.example");
   });
 
   it("fails clearly when WorkOS authorization config is missing", async () => {

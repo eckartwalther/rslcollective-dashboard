@@ -144,6 +144,13 @@ describe("company API", () => {
     const response = await route.request("/", {}, productionEnv);
 
     expect(response.status).toBe(401);
+    expect(response.headers.get("Content-Type")).toContain("application/json");
+    expect(await readJson(response)).toEqual({
+      error: {
+        code: "unauthenticated",
+        message: "Authentication required."
+      }
+    });
   });
 
   it("returns company null for an authenticated user with no company", async () => {

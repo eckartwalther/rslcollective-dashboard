@@ -1,6 +1,10 @@
 import { Hono, type Context } from "hono";
 import { requireValidOrigin, type OriginEnv } from "../lib/csrf";
-import { serverError, validationError } from "../lib/responses";
+import {
+  authenticationCouldNotCompletePage,
+  signInLinkExpiredPage
+} from "../lib/error-pages";
+import { serverError } from "../lib/responses";
 import {
   createD1SessionStore,
   createLocalSession,
@@ -81,7 +85,7 @@ export function createAuthRoutes(deps: AuthRouteDeps = defaultDeps) {
     return result.status === "ok"
       ? c.redirect(result.url)
       : result.status === "invalid_return_to"
-        ? validationError(c, "Invalid returnTo path.")
+        ? authenticationCouldNotCompletePage(c)
         : serverError(c, "WorkOS authorization is not configured.");
   });
 
@@ -90,7 +94,7 @@ export function createAuthRoutes(deps: AuthRouteDeps = defaultDeps) {
     return result.status === "ok"
       ? c.redirect(result.url)
       : result.status === "invalid_return_to"
-        ? validationError(c, "Invalid returnTo path.")
+        ? authenticationCouldNotCompletePage(c)
         : serverError(c, "WorkOS authorization is not configured.");
   });
 
@@ -124,17 +128,13 @@ async function handleAuthCallback(c: Context<{ Bindings: Bindings }>, deps: Auth
   const stateResult = await validateSignedAuthState(c.req.query("state"), c.env.SESSION_SECRET ?? "");
 
   if (!stateResult.valid) {
-    return validationError(c, "Invalid authentication state.", {
-      state: stateResult.reason
-    });
+    return signInLinkExpiredPage(c);
   }
 
   const code = c.req.query("code");
 
   if (!code) {
-    return validationError(c, "Authorization code is required.", {
-      code: "missing"
-    });
+    return authenticationCouldNotCompletePage(c);
   }
 
   let workosUser: WorkosAuthenticatedUser;
@@ -142,7 +142,7 @@ async function handleAuthCallback(c: Context<{ Bindings: Bindings }>, deps: Auth
   try {
     workosUser = await deps.exchangeAuthorizationCode(c.env, code);
   } catch {
-    return serverError(c, "WorkOS authorization code exchange failed.");
+    return authenticationCouldNotCompletePage(c, 500);
   }
 
   const userData = mapWorkosUser(workosUser);

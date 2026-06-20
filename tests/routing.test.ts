@@ -26,17 +26,12 @@ describe("Worker routing", () => {
       new Request("https://dashboard.rslcollective.org/auth/callback?code=test"),
       env
     );
-    const body = await response.json();
+    const body = await response.text();
 
     expect(response.status).toBe(400);
-    expect(body).toMatchObject({
-      error: {
-        code: "validation_error",
-        fields: {
-          state: "missing"
-        }
-      }
-    });
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    expect(body).toContain("Sign-in link expired");
+    expect(body).not.toContain("spa asset fallback");
   });
 
   it("accepts localhost host in development when DASHBOARD_BASE_URL is localhost", async () => {

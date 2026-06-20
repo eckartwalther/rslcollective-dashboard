@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Group,
+  List,
   SimpleGrid,
   Stack,
   Text,
@@ -12,9 +13,11 @@ import {
 import {
   Ban,
   BarChart3,
+  BookOpenCheck,
   Building2,
   ClipboardCheck,
   CreditCard,
+  ExternalLink,
   Library,
   ShieldCheck
 } from "lucide-react";
@@ -37,16 +40,16 @@ const dashboardCopy = {
   header: {
     title: "Dashboard",
     badge: "Beta",
-    description: "License your content and receive royalties through the RSL Collective."
+    description: "License your content and receive royalties through the RSL Collective"
   },
   gettingStarted: {
     sectionTitle: "Getting started",
-    noProfileHeading: "Define publisher profile",
-    noProfileDescription: "Submit your publisher information for RSL Collective verification.",
-    noProfileAction: "Define publisher profile",
+    description:
+      "Start with your publisher profile. The onboarding guide explains how to define RSL declarations, publish RSL files through robots.txt, enroll each website or subdomain root, and keep licensing information current.",
+    noProfileHeading: "Create publisher profile",
+    noProfileAction: "Create publisher profile",
     submittedHeading: "Publisher profile submitted",
-    submittedDescription: "Your publisher profile is under review.",
-    submittedAction: "Edit profile"
+    submittedAction: "Edit publisher profile"
   },
   cards: {
     publisherProfile: {
@@ -85,6 +88,14 @@ const dashboardCopy = {
     }
   ]
 };
+
+const gettingStartedSteps = [
+  "Create your publisher profile.",
+  "Prepare RSL declarations for the content you want to license.",
+  "Publish RSL files and link them from robots.txt.",
+  "Enroll each participating website or subdomain root after publisher verification and licensing review.",
+  "Keep RSL files and enrollment information current as content, rights, and licensing boundaries change."
+];
 
 export function DashboardHome({
   user,
@@ -130,8 +141,33 @@ export function DashboardHome({
                 {dashboardCopy.gettingStarted.noProfileHeading}
               </Title>
               <Text size="sm" c="dimmed">
-                {dashboardCopy.gettingStarted.noProfileDescription}
+                {dashboardCopy.gettingStarted.description}
               </Text>
+              <List size="sm" spacing={6} c="dimmed" mt={4}>
+                {gettingStartedSteps.map((step) => (
+                  <List.Item key={step}>{step}</List.Item>
+                ))}
+              </List>
+              <Button
+                mt="xs"
+                w="fit-content"
+                leftSection={<Building2 size={16} />}
+                onClick={onNavigateToCompany}
+              >
+                {dashboardCopy.gettingStarted.noProfileAction}
+              </Button>
+              <Button
+                component="a"
+                href="/dashboard/onboarding"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="subtle"
+                w="fit-content"
+                leftSection={<BookOpenCheck size={16} />}
+                rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
+              >
+                Read onboarding guide
+              </Button>
             </Stack>
           </Group>
         </Card>
@@ -154,12 +190,30 @@ export function DashboardHome({
                   </Badge>
                 </Group>
                 <Text size="sm" c="dimmed">
-                  {dashboardCopy.gettingStarted.submittedDescription}
+                  {dashboardCopy.gettingStarted.description}
                 </Text>
+                <List size="sm" spacing={6} c="dimmed" mt={4}>
+                  {gettingStartedSteps.map((step) => (
+                    <List.Item key={step}>{step}</List.Item>
+                  ))}
+                </List>
               </Stack>
-              <Button variant="default" leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-                {dashboardCopy.gettingStarted.submittedAction}
-              </Button>
+              <Group gap="xs">
+                <Button variant="default" leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
+                  {dashboardCopy.gettingStarted.submittedAction}
+                </Button>
+                <Button
+                  component="a"
+                  href="/dashboard/onboarding"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="subtle"
+                  leftSection={<BookOpenCheck size={16} />}
+                  rightSection={<ExternalLink size={14} aria-label="Opens in a new tab" />}
+                >
+                  Read onboarding guide
+                </Button>
+              </Group>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
               <SummaryItem label="Legal name" value={company.legalName} />
@@ -182,7 +236,9 @@ export function DashboardHome({
           color={hasCompany ? "green" : "yellow"}
           action={
             <Button variant="light" size="xs" w="fit-content" onClick={onNavigateToCompany}>
-              {hasCompany ? "Edit profile" : dashboardCopy.gettingStarted.noProfileAction}
+              {hasCompany
+                ? dashboardCopy.gettingStarted.submittedAction
+                : dashboardCopy.gettingStarted.noProfileAction}
             </Button>
           }
         />
