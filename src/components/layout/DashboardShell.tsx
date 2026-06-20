@@ -256,7 +256,6 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               isLoadingCompany={companyQuery.isLoading || companyQuery.isFetching}
               isCompanyError={companyQuery.isError}
               onNavigateToCompany={() => navigateToView("company")}
-              onNavigateToOnboarding={() => navigateToView("onboarding")}
             />
           ) : null}
           {activeView === "onboarding" ? (

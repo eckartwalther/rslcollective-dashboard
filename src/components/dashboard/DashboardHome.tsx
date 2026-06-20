@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Badge,
   Button,
   Card,
@@ -13,13 +14,14 @@ import {
 import {
   Ban,
   BarChart3,
-  BookOpenCheck,
   Building2,
   ClipboardCheck,
   CreditCard,
   Library,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from "lucide-react";
+import { useState } from "react";
 import type { SessionUser } from "../../api/session";
 import type { Company } from "../../api/company";
 import { ErrorState } from "../layout/ErrorState";
@@ -33,7 +35,6 @@ type DashboardHomeProps = {
   isLoadingCompany: boolean;
   isCompanyError: boolean;
   onNavigateToCompany: () => void;
-  onNavigateToOnboarding: () => void;
 };
 
 const dashboardCopy = {
@@ -45,49 +46,54 @@ const dashboardCopy = {
   gettingStarted: {
     sectionTitle: "Getting started",
     description:
-      "Start with your publisher profile. The onboarding guide explains how to define RSL declarations, publish RSL files through robots.txt, enroll each website or subdomain root, and keep licensing information current.",
+      "Add your publisher information so the RSL Collective can review your organization and prepare your account for licensing.",
     noProfileHeading: "Create publisher profile",
     noProfileAction: "Create publisher profile",
-    submittedHeading: "Publisher profile submitted",
     submittedAction: "Edit publisher profile"
   },
   cards: {
     publisherProfile: {
-      title: "Define publisher profile",
-      description: "Define and edit your publisher company information."
+      title: "Create profile",
+      description: "Define and edit your company information."
     },
     verification: {
-      title: "Complete publisher verification",
-      description: "Verify your profile information for RSL Collective participation."
+      title: "Complete verification",
+      description: "Verify your company information and eligibility."
     },
     licensingTerms: {
-      title: "Review licensing terms",
+      title: "Accept licensing terms",
       description: "Review and agree to the RSL Collective licensing terms."
     }
   },
   modules: [
     {
-      title: "Define licensable content",
-      description: "Identify the content you want to license through the RSL Collective licensing.",
+      title: "Register content",
+      description: "Define your collectively licensable content.",
       icon: Library
     },
     {
-      title: "Manage licensee exclusions",
+      title: "Exclude licensees",
       description: "Exclude specific licensees from accessing your licensable content.",
       icon: Ban
     },
     {
-      title: "View licensing and settlement reports",
-      description: "Review your usage, licensing, settlement, and royalty reports.",
+      title: "View reports",
+      description: "Review usage, licensing, settlement, and royalty reports.",
       icon: BarChart3
     },
     {
-      title: "Set up royalty payments",
+      title: "Set up payments",
       description: "Configure your payment details for receiving royalty payments distributions.",
       icon: CreditCard
     }
   ]
 };
+
+const primaryActionProps = {
+  size: "sm",
+  radius: "md",
+  w: "fit-content"
+} as const;
 
 const gettingStartedSteps = [
   "Create your publisher profile.",
@@ -102,10 +108,10 @@ export function DashboardHome({
   company,
   isLoadingCompany,
   isCompanyError,
-  onNavigateToCompany,
-  onNavigateToOnboarding
+  onNavigateToCompany
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
+  const [showGettingStarted, setShowGettingStarted] = useState(true);
 
   return (
     <Stack gap="lg">
@@ -128,69 +134,20 @@ export function DashboardHome({
         />
       ) : null}
 
-      {!isLoadingCompany && !hasCompany ? (
-        <Card withBorder radius="sm" p="md">
-          <Group gap="md" align="flex-start" wrap="nowrap">
-            <ThemeIcon color="blue" variant="light" size="xl" radius="sm">
-              <Building2 size={22} strokeWidth={1.8} />
-            </ThemeIcon>
-            <Stack gap="xs" maw={680}>
-              <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                {dashboardCopy.gettingStarted.sectionTitle}
-              </Text>
-              <Title order={2} size="h4">
-                {dashboardCopy.gettingStarted.noProfileHeading}
-              </Title>
-              <Text size="sm" c="dimmed">
-                {dashboardCopy.gettingStarted.description}
-              </Text>
-              <List size="sm" spacing={6} c="dimmed" mt={4}>
-                {gettingStartedSteps.map((step) => (
-                  <List.Item key={step}>{step}</List.Item>
-                ))}
-              </List>
-              <Button
-                mt="xs"
-                w="fit-content"
-                leftSection={<Building2 size={16} />}
-                onClick={onNavigateToCompany}
-              >
-                {dashboardCopy.gettingStarted.noProfileAction}
-              </Button>
-              <Button
-                component="a"
-                href="/dashboard/onboarding"
-                variant="subtle"
-                w="fit-content"
-                leftSection={<BookOpenCheck size={16} />}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onNavigateToOnboarding();
-                }}
-              >
-                Read onboarding guide
-              </Button>
-            </Stack>
-          </Group>
-        </Card>
-      ) : null}
-
-      {!isLoadingCompany && company ? (
-        <Card withBorder radius="sm" p="md">
-          <Stack gap="md">
-            <Group justify="space-between" align="flex-start" gap="md">
-              <Stack gap={4}>
+      {!isLoadingCompany && showGettingStarted ? (
+        <Card withBorder radius="sm" p="md" data-testid="dashboard-getting-started-card">
+          <Group justify="space-between" align="flex-start" gap="md" wrap="nowrap">
+            <Group gap="md" align="flex-start" wrap="nowrap">
+              <ThemeIcon color="blue" variant="light" size="xl" radius="sm">
+                <Building2 size={22} strokeWidth={1.8} />
+              </ThemeIcon>
+              <Stack gap="xs" maw={720}>
                 <Text size="xs" c="dimmed" fw={700} tt="uppercase">
                   {dashboardCopy.gettingStarted.sectionTitle}
                 </Text>
-                <Group gap="xs">
-                  <Title order={2} size="h4">
-                    {dashboardCopy.gettingStarted.submittedHeading}
-                  </Title>
-                  <Badge color="green" variant="light">
-                    Complete
-                  </Badge>
-                </Group>
+                <Title order={2} size="h4">
+                  {dashboardCopy.gettingStarted.noProfileHeading}
+                </Title>
                 <Text size="sm" c="dimmed">
                   {dashboardCopy.gettingStarted.description}
                 </Text>
@@ -200,33 +157,18 @@ export function DashboardHome({
                   ))}
                 </List>
               </Stack>
-              <Group gap="xs">
-                <Button variant="default" leftSection={<Building2 size={16} />} onClick={onNavigateToCompany}>
-                  {dashboardCopy.gettingStarted.submittedAction}
-                </Button>
-                <Button
-                  component="a"
-                  href="/dashboard/onboarding"
-                  variant="subtle"
-                  leftSection={<BookOpenCheck size={16} />}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onNavigateToOnboarding();
-                  }}
-                >
-                  Read onboarding guide
-                </Button>
-              </Group>
             </Group>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-              <SummaryItem label="Legal name" value={company.legalName} />
-              <SummaryItem label="Display name" value={company.displayName} />
-              <SummaryItem label="Publisher type" value={company.companyType} />
-              <SummaryItem label="Country" value={company.country} />
-              <SummaryItem label="Primary contact" value={company.primaryContactName} />
-              <SummaryItem label="Contact email" value={company.primaryContactEmail} />
-            </SimpleGrid>
-          </Stack>
+            <ActionIcon
+              aria-label="Dismiss getting started"
+              variant="subtle"
+              color="gray"
+              size="sm"
+              radius="md"
+              onClick={() => setShowGettingStarted(false)}
+            >
+              <X size={16} aria-hidden="true" />
+            </ActionIcon>
+          </Group>
         </Card>
       ) : null}
 
@@ -238,7 +180,13 @@ export function DashboardHome({
           icon={Building2}
           color={hasCompany ? "green" : "yellow"}
           action={
-            <Button variant="light" size="xs" w="fit-content" onClick={onNavigateToCompany}>
+            <Button
+              data-dashboard-action="compact"
+              data-testid="dashboard-define-profile-action"
+              leftSection={<Building2 size={16} />}
+              onClick={onNavigateToCompany}
+              {...primaryActionProps}
+            >
               {hasCompany
                 ? dashboardCopy.gettingStarted.submittedAction
                 : dashboardCopy.gettingStarted.noProfileAction}
@@ -252,7 +200,12 @@ export function DashboardHome({
           icon={ShieldCheck}
           color={hasCompany ? "yellow" : "orange"}
           action={
-            <Button variant="light" size="xs" w="fit-content" disabled>
+            <Button
+              data-dashboard-action="compact"
+              data-testid="dashboard-verify-profile-action"
+              disabled
+              {...primaryActionProps}
+            >
               Verify profile
             </Button>
           }
@@ -275,17 +228,6 @@ export function DashboardHome({
           />
         ))}
       </SimpleGrid>
-    </Stack>
-  );
-}
-
-function SummaryItem({ label, value }: { label: string; value: string | null }) {
-  return (
-    <Stack gap={3}>
-      <Text size="xs" c="dimmed" fw={600}>
-        {label}
-      </Text>
-      <Text size="sm">{value || "Not provided"}</Text>
     </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AppProviders } from "../src/app/providers";
 import { DashboardPage } from "../src/pages/DashboardPage";
 import type { SessionResponse } from "../src/api/session";
@@ -25,6 +25,8 @@ const company = {
 };
 
 const removedSummaryLabel = ["Onboarding", "summary"].join(" ");
+const staticPublisherProfileBody =
+  "Add your publisher information so the RSL Collective can review your organization and prepare your account for licensing.";
 
 function authenticatedSession(overrides: Partial<AuthenticatedSession["user"]> = {}): SessionResponse {
   return {
@@ -161,32 +163,81 @@ describe("dashboard behavior", () => {
     expect(
       await screen.findByRole("heading", { name: "Create publisher profile" })
     ).toBeInTheDocument();
+    const gettingStartedCard = screen.getByTestId("dashboard-getting-started-card");
+
+    expect(within(gettingStartedCard).getByText(staticPublisherProfileBody)).toBeInTheDocument();
+    expect(within(gettingStartedCard).getByText("Create your publisher profile.")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Start with your publisher profile. The onboarding guide explains how to define RSL declarations, publish RSL files through robots.txt, enroll each website or subdomain root, and keep licensing information current."
+      within(gettingStartedCard).getByText(
+        "Prepare RSL declarations for the content you want to license."
       )
     ).toBeInTheDocument();
-    expect(screen.getByText("Create your publisher profile.")).toBeInTheDocument();
+    expect(within(gettingStartedCard).getByText("Publish RSL files and link them from robots.txt.")).toBeInTheDocument();
     expect(
-      screen.getByText("Prepare RSL declarations for the content you want to license.")
-    ).toBeInTheDocument();
-    expect(screen.getByText("Publish RSL files and link them from robots.txt.")).toBeInTheDocument();
-    expect(
-      screen.getByText(
+      within(gettingStartedCard).getByText(
         "Enroll each participating website or subdomain root after publisher verification and licensing review."
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
+      within(gettingStartedCard).getByText(
         "Keep RSL files and enrollment information current as content, rights, and licensing boundaries change."
       )
     ).toBeInTheDocument();
+    expect(
+      within(gettingStartedCard).getByRole("button", { name: "Dismiss getting started" })
+    ).toBeInTheDocument();
+    expect(
+      within(gettingStartedCard).queryByRole("button", { name: "Create publisher profile" })
+    ).not.toBeInTheDocument();
+    expect(
+      within(gettingStartedCard).queryByRole("link", { name: /Read onboarding guide/i })
+    ).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Create publisher profile" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /Read onboarding guide/i })).toHaveAttribute(
-      "href",
-      "/dashboard/onboarding"
+    expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
+      "data-dashboard-action",
+      "compact"
     );
+    expect(screen.getByTestId("dashboard-verify-profile-action")).toHaveAttribute(
+      "data-dashboard-action",
+      "compact"
+    );
+    expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
+  });
+
+  it("dismisses the Getting started card without making an API call", async () => {
+    const fetchMock = mockDashboardFetch(
+      authenticatedSession({
+        hasCompany: false
+      }),
+      { company: null }
+    );
+
+    renderDashboard();
+
+    const card = await screen.findByTestId("dashboard-getting-started-card");
+    const callCountBeforeDismiss = fetchMock.mock.calls.length;
+
+    fireEvent.click(within(card).getByRole("button", { name: "Dismiss getting started" }));
+
+    expect(screen.queryByTestId("dashboard-getting-started-card")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(callCountBeforeDismiss);
+  });
+
+  it("routes the profile action card button to the Publisher Profile view", async () => {
+    mockDashboardFetch(
+      authenticatedSession({
+        hasCompany: false
+      }),
+      { company: null }
+    );
+
+    renderDashboard();
+
+    fireEvent.click(await screen.findByTestId("dashboard-define-profile-action"));
+
+    expect(window.location.pathname).toBe("/dashboard/company");
+    expect(await screen.findByLabelText(/^Legal company name/i)).toBeInTheDocument();
   });
 
   it("renders sidebar navigation and disabled approval-gated modules", async () => {
@@ -295,17 +346,32 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    expect(await screen.findByText("Publisher profile submitted")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Start with your publisher profile. The onboarding guide explains how to define RSL declarations, publish RSL files through robots.txt, enroll each website or subdomain root, and keep licensing information current."
-      )
+      await screen.findByRole("heading", { name: "Create publisher profile" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Example Media Inc.")).toBeInTheDocument();
+    const gettingStartedCard = screen.getByTestId("dashboard-getting-started-card");
+
+    expect(within(gettingStartedCard).getByText(staticPublisherProfileBody)).toBeInTheDocument();
+    expect(
+      within(gettingStartedCard).queryByRole("button", { name: "Edit publisher profile" })
+    ).not.toBeInTheDocument();
+    expect(
+      within(gettingStartedCard).queryByRole("link", { name: /Read onboarding guide/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Publisher profile submitted")).not.toBeInTheDocument();
+    expect(screen.queryByText("Example Media Inc.")).not.toBeInTheDocument();
     expect(screen.getByText("Define publisher profile")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Edit publisher profile" }).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
+      "data-dashboard-action",
+      "compact"
+    );
+    expect(screen.getByTestId("dashboard-verify-profile-action")).toHaveAttribute(
+      "data-dashboard-action",
+      "compact"
+    );
     expect(screen.getByText("Complete publisher verification")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Verify profile" })).toBeDisabled();
+    expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
     expect(screen.getByText("Review licensing terms")).toBeInTheDocument();
     expect(screen.getByText("Review and agree to the RSL Collective licensing terms.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review licensing terms" })).not.toBeInTheDocument();
@@ -322,7 +388,7 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    await screen.findByText("Publisher profile submitted");
+    await screen.findByRole("heading", { name: "Create publisher profile" });
 
     const text = document.body.textContent ?? "";
 
@@ -352,7 +418,7 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    await screen.findByText("Publisher profile submitted");
+    await screen.findByRole("heading", { name: "Create publisher profile" });
     fireEvent.click(screen.getByRole("button", { name: "Verify profile" }));
 
     expect(window.location.pathname).toBe("/dashboard");
@@ -375,10 +441,8 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByRole("heading", { name: "Publisher Onboarding Guide" })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("onboarding-doc-layout")).toBeInTheDocument();
+    expect(await screen.findByTestId("onboarding-doc-layout", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Onboarding Guide");
     expect(screen.getByTestId("onboarding-article-body")).toBeInTheDocument();
     expect(screen.queryByText(removedSummaryLabel)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(removedSummaryLabel);
@@ -423,21 +487,15 @@ describe("dashboard behavior", () => {
     expect(calledPaths).not.toContain("/api/rsl");
   });
 
-  it("links from the Dashboard getting started summary to the onboarding guide", async () => {
+  it("does not render a Dashboard home onboarding guide action", async () => {
     mockDashboardFetch(authenticatedSession());
 
     renderDashboard();
 
-    const link = await screen.findByRole("link", { name: /Read onboarding guide/i });
+    await screen.findByRole("heading", { name: "Dashboard" });
 
-    expect(link).toHaveAttribute("href", "/dashboard/onboarding");
-    expect(link).not.toHaveAttribute("target");
-    expect(link).not.toHaveAttribute("rel");
-    expect(link).not.toHaveTextContent("Opens in a new tab");
-
-    fireEvent.click(link);
-
-    expect(window.location.pathname).toBe("/dashboard/onboarding");
+    expect(screen.queryByRole("link", { name: /Read onboarding guide/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Read onboarding guide/i })).not.toBeInTheDocument();
   });
 
   it("renders /dashboard/onboarding as an authenticated static dashboard view", async () => {
@@ -446,9 +504,8 @@ describe("dashboard behavior", () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByRole("heading", { name: "Publisher Onboarding Guide" })
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("onboarding-doc-layout", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Onboarding Guide");
     expect(
       screen.getByText(
         /This guide helps publishers prepare their content for licensing through the RSL Collective/
