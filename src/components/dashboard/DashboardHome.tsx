@@ -58,7 +58,7 @@ const dashboardCopy = {
     },
     verification: {
       title: "Complete verification",
-      description: "Verify your company information and eligibility."
+      description: "Verify your company's eligibility for RSL Collective participation."
     },
     licensingTerms: {
       title: "Accept licensing terms",
@@ -83,7 +83,7 @@ const dashboardCopy = {
     },
     {
       title: "Set up payments",
-      description: "Configure your payment details for receiving royalty payments distributions.",
+      description: "Configure payment information to receive licensing payments.",
       icon: CreditCard
     }
   ]
