@@ -360,7 +360,7 @@ describe("dashboard behavior", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Publisher profile submitted")).not.toBeInTheDocument();
     expect(screen.queryByText("Example Media Inc.")).not.toBeInTheDocument();
-    expect(screen.getByText("Define publisher profile")).toBeInTheDocument();
+    expect(screen.getByText("Create profile")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Edit publisher profile" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
       "data-dashboard-action",
@@ -370,16 +370,16 @@ describe("dashboard behavior", () => {
       "data-dashboard-action",
       "compact"
     );
-    expect(screen.getByText("Complete publisher verification")).toBeInTheDocument();
+    expect(screen.getByText("Complete verification")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
-    expect(screen.getByText("Review licensing terms")).toBeInTheDocument();
+    expect(screen.getByText("Accept licensing terms")).toBeInTheDocument();
     expect(screen.getByText("Review and agree to the RSL Collective licensing terms.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review licensing terms" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Review licensing terms" })).not.toBeInTheDocument();
-    expect(screen.getByText("Define licensable content")).toBeInTheDocument();
-    expect(screen.getByText("Manage licensee exclusions")).toBeInTheDocument();
-    expect(screen.getByText("View licensing and settlement reports")).toBeInTheDocument();
-    expect(screen.getByText("Set up royalty payments")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept licensing terms" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Accept licensing terms" })).not.toBeInTheDocument();
+    expect(screen.getByText("Register content")).toBeInTheDocument();
+    expect(screen.getByText("Exclude licensees")).toBeInTheDocument();
+    expect(screen.getByText("View reports")).toBeInTheDocument();
+    expect(screen.getByText("Set up payments")).toBeInTheDocument();
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 
