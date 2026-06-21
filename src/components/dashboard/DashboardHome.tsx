@@ -6,6 +6,7 @@ import {
   Card,
   SimpleGrid,
   Stack,
+  Text,
   Title
 } from "@mantine/core";
 import {
@@ -25,6 +26,7 @@ import { ErrorState } from "../layout/ErrorState";
 import { LoadingState } from "../layout/LoadingState";
 import { PageHeader } from "../layout/PageHeader";
 import { StatusCard } from "./StatusCard";
+import type { WorkflowCardState } from "./StatusCard";
 import styles from "./DashboardHome.module.css";
 
 type DashboardHomeProps = {
@@ -50,11 +52,11 @@ const dashboardCopy = {
   cards: {
     publisherProfile: {
       title: "Create publisher profile",
-      description: "Tell us who you are so we can verify your organization and prepare your account for licensing."
+      description: "Register your organization and prepare your account for licensing."
     },
     verification: {
       title: "Complete verification",
-      description: "Confirm your eligibility to participate in RSL Collective licensing."
+      description: "Confirm your company's eligibility to license content through the RSL Collective."
     },
     licensingTerms: {
       title: "Accept licensing terms",
@@ -99,6 +101,15 @@ const gettingStartedSteps = [
   "Receive reporting and royalty payments when licensees use your content."
 ];
 
+const workflowAccentColorByState: Record<WorkflowCardState, string> = {
+  available: "#bfdbfe",
+  complete: "#bbf7d0",
+  error: "#fecaca",
+  "not-started": "#fde68a",
+  "pending-profile": "#fed7aa",
+  "pending-verification": "#e5e7eb"
+};
+
 export function DashboardHome({
   user,
   company,
@@ -108,6 +119,8 @@ export function DashboardHome({
   onNavigateToOnboarding
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
+  const publisherProfileState: WorkflowCardState = hasCompany ? "complete" : "not-started";
+  const verificationState: WorkflowCardState = hasCompany ? "pending-verification" : "pending-profile";
   const [showGettingStarted, setShowGettingStarted] = useState(true);
 
   return (
@@ -115,7 +128,7 @@ export function DashboardHome({
       <PageHeader
         title={dashboardCopy.header.title}
         badge={
-          <Badge color="blue" variant="light">
+          <Badge color="blue" variant="light" size="xs" radius="sm">
             {dashboardCopy.header.badge}
           </Badge>
         }
@@ -179,62 +192,73 @@ export function DashboardHome({
         </Card>
       ) : null}
 
-      <SimpleGrid cols={{ base: 1, sm: 2 }}>
-        <StatusCard
-          title={dashboardCopy.cards.publisherProfile.title}
-          status={hasCompany ? "Complete" : "Not started"}
-          description={dashboardCopy.cards.publisherProfile.description}
-          icon={Building2}
-          color={hasCompany ? "green" : "yellow"}
-          action={
-            <Button
-              data-dashboard-action="restrained"
-              data-testid="dashboard-define-profile-action"
-              leftSection={<Building2 size={16} />}
-              onClick={onNavigateToCompany}
-              {...primaryActionProps}
-            >
-              {hasCompany
-                ? dashboardCopy.gettingStarted.submittedAction
-                : dashboardCopy.gettingStarted.noProfileAction}
-            </Button>
-          }
-        />
-        <StatusCard
-          title={dashboardCopy.cards.verification.title}
-          status={hasCompany ? "Pending verification" : "Pending profile"}
-          description={dashboardCopy.cards.verification.description}
-          icon={ShieldCheck}
-          color={hasCompany ? "yellow" : "orange"}
-          action={
-            <Button
-              data-dashboard-action="restrained"
-              data-testid="dashboard-verify-profile-action"
-              disabled
-              {...primaryActionProps}
-            >
-              Verify profile
-            </Button>
-          }
-        />
-        <StatusCard
-          title={dashboardCopy.cards.licensingTerms.title}
-          status="Pending verification"
-          description={dashboardCopy.cards.licensingTerms.description}
-          icon={ClipboardCheck}
-          color="gray"
-        />
-        {dashboardCopy.modules.map((module) => (
+      <Stack gap="sm">
+        <Text className={styles.workflowSectionLabel}>Publisher setup</Text>
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
           <StatusCard
-            key={module.title}
-            title={module.title}
-            status="Pending verification"
-            description={module.description}
-            icon={module.icon}
-            color="gray"
+            title={dashboardCopy.cards.publisherProfile.title}
+            status={hasCompany ? "Complete" : "Not started"}
+            description={dashboardCopy.cards.publisherProfile.description}
+            icon={Building2}
+            color={hasCompany ? "green" : "yellow"}
+            cardState={publisherProfileState}
+            accentColor={workflowAccentColorByState[publisherProfileState]}
+            action={
+              <Button
+                data-dashboard-action="restrained"
+                data-testid="dashboard-define-profile-action"
+                leftSection={<Building2 size={16} />}
+                onClick={onNavigateToCompany}
+                {...primaryActionProps}
+              >
+                {hasCompany
+                  ? dashboardCopy.gettingStarted.submittedAction
+                  : dashboardCopy.gettingStarted.noProfileAction}
+              </Button>
+            }
           />
-        ))}
-      </SimpleGrid>
+          <StatusCard
+            title={dashboardCopy.cards.verification.title}
+            status={hasCompany ? "Pending verification" : "Pending profile"}
+            description={dashboardCopy.cards.verification.description}
+            icon={ShieldCheck}
+            color={hasCompany ? "gray" : "orange"}
+            cardState={verificationState}
+            accentColor={workflowAccentColorByState[verificationState]}
+            action={
+              <Button
+                data-dashboard-action="restrained"
+                data-testid="dashboard-verify-profile-action"
+                disabled
+                {...primaryActionProps}
+              >
+                Verify profile
+              </Button>
+            }
+          />
+          <StatusCard
+            title={dashboardCopy.cards.licensingTerms.title}
+            status="Pending verification"
+            description={dashboardCopy.cards.licensingTerms.description}
+            icon={ClipboardCheck}
+            color="gray"
+            cardState="pending-verification"
+            accentColor={workflowAccentColorByState["pending-verification"]}
+          />
+          {dashboardCopy.modules.map((module) => (
+            <StatusCard
+              key={module.title}
+              title={module.title}
+              status="Pending verification"
+              description={module.description}
+              icon={module.icon}
+              color="gray"
+              cardState="pending-verification"
+              accentColor={workflowAccentColorByState["pending-verification"]}
+            />
+          ))}
+        </SimpleGrid>
+      </Stack>
     </Stack>
   );
 }

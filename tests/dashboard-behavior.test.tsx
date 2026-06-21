@@ -78,6 +78,14 @@ function renderDashboard() {
   );
 }
 
+function getWorkflowCard(name: string) {
+  const title = screen.getByRole("heading", { name });
+  const card = title.closest("[data-card-state]");
+
+  expect(card).not.toBeNull();
+  return card as HTMLElement;
+}
+
 describe("dashboard behavior", () => {
   beforeEach(() => {
     window.history.pushState(null, "", "/dashboard");
@@ -206,6 +214,13 @@ describe("dashboard behavior", () => {
       "restrained"
     );
     expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
+    expect(getWorkflowCard("Create publisher profile")).toHaveAttribute("data-card-state", "not-started");
+    expect(getWorkflowCard("Complete verification")).toHaveAttribute("data-card-state", "pending-profile");
+    expect(getWorkflowCard("Accept licensing terms")).toHaveAttribute("data-card-state", "pending-verification");
+    expect(getWorkflowCard("Register content")).toHaveAttribute("data-card-state", "pending-verification");
+    expect(getWorkflowCard("Manage licensees")).toHaveAttribute("data-card-state", "pending-verification");
+    expect(getWorkflowCard("View reports")).toHaveAttribute("data-card-state", "pending-verification");
+    expect(getWorkflowCard("Set up payouts")).toHaveAttribute("data-card-state", "pending-verification");
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 
@@ -363,7 +378,7 @@ describe("dashboard behavior", () => {
     expect(screen.queryByText("Example Media Inc.")).not.toBeInTheDocument();
     expect(screen.getByText("Create publisher profile")).toBeInTheDocument();
     expect(
-      screen.getByText("Tell us who you are so we can verify your organization and prepare your account for licensing.")
+      screen.getByText("Register your organization and prepare your account for licensing.")
     ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Edit publisher profile" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
@@ -375,7 +390,9 @@ describe("dashboard behavior", () => {
       "restrained"
     );
     expect(screen.getByText("Complete verification")).toBeInTheDocument();
-    expect(screen.getByText("Confirm your eligibility to participate in RSL Collective licensing.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Confirm your company's eligibility to license content through the RSL Collective.")
+    ).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
     expect(screen.getByText("Accept licensing terms")).toBeInTheDocument();
     expect(
@@ -397,6 +414,9 @@ describe("dashboard behavior", () => {
     expect(
       screen.getByText("Add payment details so royalties can be distributed when licensees use your content.")
     ).toBeInTheDocument();
+    expect(getWorkflowCard("Create publisher profile")).toHaveAttribute("data-card-state", "complete");
+    expect(getWorkflowCard("Complete verification")).toHaveAttribute("data-card-state", "pending-verification");
+    expect(getWorkflowCard("Accept licensing terms")).toHaveAttribute("data-card-state", "pending-verification");
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
   });
 

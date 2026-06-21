@@ -18,9 +18,9 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <Group justify="space-between" align="start" gap="md" wrap="wrap">
-      <Stack gap={8} maw={740}>
+      <Stack gap={6} maw={740}>
         <Group gap="xs" align="center">
-          <Title order={1} size="h2" lh={1.15}>
+          <Title order={1} size="h2" lh={1.1}>
             {title}
           </Title>
           {badge}

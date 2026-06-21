@@ -1,0 +1,101 @@
+.navbar {
+  border-right-color: var(--mantine-color-gray-2);
+}
+
+.workspaceLabel {
+  letter-spacing: 0.04em;
+}
+
+.navigation {
+  gap: 3px;
+}
+
+.navLink {
+  border-radius: 8px;
+  min-height: 36px;
+}
+
+.navLink :global(.mantine-NavLink-section) {
+  color: var(--mantine-color-gray-5);
+  margin-inline-end: 10px;
+}
+
+.navLink :global(.mantine-NavLink-label) {
+  color: var(--mantine-color-gray-7);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.navLink:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+.navLink[data-active] {
+  background: var(--mantine-color-blue-0);
+}
+
+.navLink[data-active] :global(.mantine-NavLink-section),
+.navLink[data-active] :global(.mantine-NavLink-label) {
+  color: var(--mantine-color-blue-8);
+  font-weight: 600;
+}
+
+.navLink[data-disabled] {
+  opacity: 1;
+}
+
+.navLink[data-disabled] :global(.mantine-NavLink-section),
+.navLink[data-disabled] :global(.mantine-NavLink-label) {
+  color: var(--mantine-color-gray-5);
+}
+
+.onboardingDivider {
+  border-top-color: var(--mantine-color-gray-2);
+  margin: 7px 8px 6px 34px;
+}
+
+.accountCluster {
+  align-items: center;
+  display: flex;
+  gap: 22px;
+}
+
+.accountIdentity {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.accountName {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.accountEmail {
+  color: #8a93a3;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.signOutButton {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  box-shadow: none;
+  color: #111827;
+  height: 36px;
+  padding-inline: 14px;
+}
+
+.signOutButton:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.signOutButton svg {
+  color: #1d4ed8;
+}

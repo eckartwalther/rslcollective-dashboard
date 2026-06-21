@@ -35,6 +35,7 @@ import { AccountTab } from "../dashboard/AccountTab";
 import { CompanyProfileTab } from "../dashboard/CompanyProfileTab";
 import { DashboardHome } from "../dashboard/DashboardHome";
 import { LoadingState } from "./LoadingState";
+import styles from "./DashboardShell.module.css";
 
 const OnboardingGuide = lazy(() =>
   import("../dashboard/OnboardingGuide").then((module) => ({
@@ -133,12 +134,12 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
             </UnstyledButton>
           </Group>
 
-          <Group gap="sm" wrap="nowrap">
-            <Stack gap={0} align="flex-end" visibleFrom="xs">
-              <Text size="sm" fw={500} truncate="end" maw={220}>
+          <Group className={styles.accountCluster} wrap="nowrap">
+            <Stack className={styles.accountIdentity} visibleFrom="xs">
+              <Text className={styles.accountName} truncate="end" maw={220}>
                 {fullName || user.email}
               </Text>
-              <Text size="xs" c="dimmed" truncate="end" maw={220}>
+              <Text className={styles.accountEmail} truncate="end" maw={220}>
                 {user.email}
               </Text>
             </Stack>
@@ -146,6 +147,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               <Button
                 variant="default"
                 leftSection={<LogOut size={16} />}
+                className={styles.signOutButton}
                 onClick={onSignOut}
               >
                 Sign out
@@ -155,10 +157,10 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
+      <AppShell.Navbar p="md" className={styles.navbar}>
         <Stack gap="lg" h="100%">
           <Stack gap={2}>
-            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase" className={styles.workspaceLabel}>
               Workspace
             </Text>
             <Text size="sm" fw={600}>
@@ -166,7 +168,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
             </Text>
           </Stack>
 
-          <Stack gap="xs" data-testid="dashboard-navigation">
+          <Stack className={styles.navigation} data-testid="dashboard-navigation">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const active = Boolean(item.view && item.view === activeView);
@@ -182,6 +184,7 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
                   aria-label={item.disabled ? `${item.label}. ${item.disabledReason}` : item.label}
                   active={active}
                   disabled={item.disabled}
+                  className={styles.navLink}
                   color={theme.primaryColor}
                   onClick={() => {
                     if (item.view) {
@@ -189,25 +192,14 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
                       close();
                     }
                   }}
-                  styles={{
-                    root: {
-                      borderRadius: 6,
-                      minHeight: 34
-                    },
-                    label: {
-                      fontSize: 14
-                    },
-                    section: {
-                      color: active
-                        ? `var(--mantine-color-${theme.primaryColor}-7)`
-                        : "var(--mantine-color-gray-6)"
-                    }
-                  }}
                 />
               );
             })}
 
-            <Divider data-testid="onboarding-guide-divider" />
+            <Divider
+              className={styles.onboardingDivider}
+              data-testid="onboarding-guide-divider"
+            />
             <NavLink
               component="a"
               data-testid="dashboard-help-navigation"
@@ -216,26 +208,12 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
               aria-label="Onboarding Guide"
               leftSection={<BookOpenCheck size={16} strokeWidth={1.8} />}
               active={activeView === "onboarding"}
+              className={styles.navLink}
               color={theme.primaryColor}
               onClick={(event) => {
                 event.preventDefault();
                 navigateToView("onboarding");
                 close();
-              }}
-              styles={{
-                root: {
-                  borderRadius: 6,
-                  minHeight: 34
-                },
-                label: {
-                  fontSize: 14
-                },
-                section: {
-                  color:
-                    activeView === "onboarding"
-                      ? `var(--mantine-color-${theme.primaryColor}-7)`
-                      : "var(--mantine-color-gray-6)"
-                }
               }}
             />
           </Stack>

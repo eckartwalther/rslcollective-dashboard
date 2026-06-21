@@ -84,3 +84,102 @@
 .gettingStartedGuideLink:hover {
   text-decoration: underline;
 }
+
+.workflowCard {
+  background: #ffffff;
+  border-color: var(--mantine-color-gray-2);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  overflow: hidden;
+  padding-left: 20px;
+  position: relative;
+}
+
+.workflowCard::before {
+  background: var(--card-accent-color, var(--mantine-color-gray-4));
+  bottom: 0;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 4px;
+}
+
+.workflowSectionLabel {
+  color: var(--mantine-color-gray-7);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.workflowCardHeader {
+  gap: 14px;
+}
+
+.workflowHeadingGroup {
+  min-width: 0;
+}
+
+.workflowIcon {
+  background: var(--mantine-color-gray-0);
+  color: var(--mantine-color-gray-6);
+  height: 34px;
+  min-width: 34px;
+  width: 34px;
+}
+
+.workflowTitle {
+  color: var(--mantine-color-gray-9);
+  line-height: 1.22;
+}
+
+.workflowDescription {
+  color: var(--mantine-color-gray-6);
+  line-height: 1.55;
+}
+
+.statusBadge {
+  background: var(--mantine-color-gray-0);
+  color: var(--mantine-color-gray-6);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  min-width: fit-content;
+  padding-inline: 8px;
+}
+
+.workflowCard[data-card-state="complete"] .workflowIcon,
+.workflowCard[data-card-state="complete"] .statusBadge {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.workflowCard[data-card-state="not-started"] .workflowIcon,
+.workflowCard[data-card-state="not-started"] .statusBadge {
+  background: #fffbeb;
+  color: #a16207;
+}
+
+.workflowCard[data-card-state="pending-profile"] .workflowIcon,
+.workflowCard[data-card-state="pending-profile"] .statusBadge {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.workflowCard[data-card-state="available"] .workflowIcon,
+.workflowCard[data-card-state="available"] .statusBadge {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.workflowCard[data-card-state="error"] .workflowIcon,
+.workflowCard[data-card-state="error"] .statusBadge {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.workflowCard[data-card-state="pending-verification"] .workflowIcon,
+.workflowCard[data-card-state="pending-verification"] .statusBadge {
+  background: var(--mantine-color-gray-0);
+  color: var(--mantine-color-gray-6);
+}
