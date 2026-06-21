@@ -339,7 +339,9 @@ describe("CompanyProfileForm", () => {
     renderWithProviders(<DashboardPage />);
 
     expect(
-      await screen.findByRole("heading", { name: "Create publisher profile" })
+      await screen.findByRole("heading", {
+        name: "Turn AI use of your content into licensing revenue"
+      })
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Publisher Profile/i }));

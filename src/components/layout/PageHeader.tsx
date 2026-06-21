@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type PageHeaderProps = {
   title: string;
-  description: ReactNode;
+  description?: ReactNode;
   badge?: ReactNode;
   actions?: ReactNode;
   metadata?: ReactNode;
@@ -29,8 +29,10 @@ export function PageHeader({
           <Text c="dimmed" size="sm" maw={680}>
             {description}
           </Text>
-        ) : (
+        ) : description ? (
           description
+        ) : (
+          null
         )}
         {metadata ? (
           <Group gap="xs" mt={2} wrap="wrap">

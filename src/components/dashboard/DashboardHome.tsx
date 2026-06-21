@@ -1,14 +1,11 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
   Card,
-  Group,
-  List,
   SimpleGrid,
   Stack,
-  Text,
-  ThemeIcon,
   Title
 } from "@mantine/core";
 import {
@@ -28,6 +25,7 @@ import { ErrorState } from "../layout/ErrorState";
 import { LoadingState } from "../layout/LoadingState";
 import { PageHeader } from "../layout/PageHeader";
 import { StatusCard } from "./StatusCard";
+import styles from "./DashboardHome.module.css";
 
 type DashboardHomeProps = {
   user: SessionUser;
@@ -35,72 +33,70 @@ type DashboardHomeProps = {
   isLoadingCompany: boolean;
   isCompanyError: boolean;
   onNavigateToCompany: () => void;
+  onNavigateToOnboarding: () => void;
 };
 
 const dashboardCopy = {
   header: {
     title: "Dashboard",
-    badge: "Beta",
-    description: "License your content and receive royalties through the RSL Collective"
+    badge: "Beta"
   },
   gettingStarted: {
     sectionTitle: "Getting started",
-    description:
-      "Add your publisher information so the RSL Collective can review your organization and prepare your account for licensing.",
-    noProfileHeading: "Create publisher profile",
+    noProfileHeading: "Turn AI use of your content into licensing revenue",
     noProfileAction: "Create publisher profile",
     submittedAction: "Edit publisher profile"
   },
   cards: {
     publisherProfile: {
-      title: "Create profile",
-      description: "Define and edit your company information."
+      title: "Create publisher profile",
+      description: "Tell us who you are so we can verify your organization and prepare your account for licensing."
     },
     verification: {
       title: "Complete verification",
-      description: "Verify your company's eligibility for RSL Collective participation."
+      description: "Confirm your eligibility to participate in RSL Collective licensing."
     },
     licensingTerms: {
       title: "Accept licensing terms",
-      description: "Review and agree to the RSL Collective licensing terms."
+      description: "Review and accept the terms that allow the Collective to license eligible content on your behalf."
     }
   },
   modules: [
     {
       title: "Register content",
-      description: "Define your collectively licensable content.",
+      description: "Enroll the websites, subdomains, and RSL declarations you want included in collective licensing.",
       icon: Library
     },
     {
-      title: "Exclude licensees",
-      description: "Exclude specific licensees from accessing your licensable content.",
+      title: "Manage licensees",
+      description: "Exclude specific participating licensees from access to selected licensable content.",
       icon: Ban
     },
     {
       title: "View reports",
-      description: "Review usage, licensing, settlement, and royalty reports.",
+      description: "Track usage, licensing activity, settlements, and royalty reporting.",
       icon: BarChart3
     },
     {
-      title: "Set up payments",
-      description: "Configure payment information to receive licensing payments.",
+      title: "Set up payouts",
+      description: "Add payment details so royalties can be distributed when licensees use your content.",
       icon: CreditCard
     }
   ]
 };
 
 const primaryActionProps = {
+  variant: "light",
+  color: "blue",
   size: "sm",
   radius: "md",
   w: "fit-content"
 } as const;
 
 const gettingStartedSteps = [
-  "Create your publisher profile.",
-  "Prepare RSL declarations for the content you want to license.",
-  "Publish RSL files and link them from robots.txt.",
-  "Enroll each participating website or subdomain root after publisher verification and licensing review.",
-  "Keep RSL files and enrollment information current as content, rights, and licensing boundaries change."
+  "Join the RSL Collective and accept the collective licensing terms.",
+  "Publish and register RSL declarations for eligible content.",
+  "Receive reporting and royalty payments when licensees use your content."
 ];
 
 export function DashboardHome({
@@ -108,7 +104,8 @@ export function DashboardHome({
   company,
   isLoadingCompany,
   isCompanyError,
-  onNavigateToCompany
+  onNavigateToCompany,
+  onNavigateToOnboarding
 }: DashboardHomeProps) {
   const hasCompany = Boolean(company ?? user.hasCompany);
   const [showGettingStarted, setShowGettingStarted] = useState(true);
@@ -117,7 +114,6 @@ export function DashboardHome({
     <Stack gap="lg">
       <PageHeader
         title={dashboardCopy.header.title}
-        description={dashboardCopy.header.description}
         badge={
           <Badge color="blue" variant="light">
             {dashboardCopy.header.badge}
@@ -135,40 +131,51 @@ export function DashboardHome({
       ) : null}
 
       {!isLoadingCompany && showGettingStarted ? (
-        <Card withBorder radius="sm" p="md" data-testid="dashboard-getting-started-card">
-          <Group justify="space-between" align="flex-start" gap="md" wrap="nowrap">
-            <Group gap="md" align="flex-start" wrap="nowrap">
-              <ThemeIcon color="blue" variant="light" size="xl" radius="sm">
-                <Building2 size={22} strokeWidth={1.8} />
-              </ThemeIcon>
-              <Stack gap="xs" maw={720}>
-                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  {dashboardCopy.gettingStarted.sectionTitle}
-                </Text>
-                <Title order={2} size="h4">
-                  {dashboardCopy.gettingStarted.noProfileHeading}
-                </Title>
-                <Text size="sm" c="dimmed">
-                  {dashboardCopy.gettingStarted.description}
-                </Text>
-                <List size="sm" spacing={6} c="dimmed" mt={4}>
-                  {gettingStartedSteps.map((step) => (
-                    <List.Item key={step}>{step}</List.Item>
-                  ))}
-                </List>
-              </Stack>
-            </Group>
-            <ActionIcon
-              aria-label="Dismiss getting started"
-              variant="subtle"
-              color="gray"
-              size="sm"
-              radius="md"
-              onClick={() => setShowGettingStarted(false)}
-            >
-              <X size={16} aria-hidden="true" />
-            </ActionIcon>
-          </Group>
+        <Card
+          withBorder
+          radius="sm"
+          p="md"
+          className={styles.gettingStartedCard}
+          data-testid="dashboard-getting-started-card"
+        >
+          <ActionIcon
+            aria-label="Dismiss getting started"
+            variant="subtle"
+            color="gray"
+            size="sm"
+            radius="md"
+            className={styles.gettingStartedDismiss}
+            onClick={() => setShowGettingStarted(false)}
+          >
+            <X size={16} aria-hidden="true" />
+          </ActionIcon>
+          <Stack gap={0} maw={720}>
+            <Title order={2} size="h4" className={styles.gettingStartedTitle}>
+              {dashboardCopy.gettingStarted.noProfileHeading}
+            </Title>
+            <ol className={styles.gettingStartedSteps} aria-label="Getting started steps">
+              {gettingStartedSteps.map((step, index) => (
+                <li className={styles.gettingStartedStep} data-testid="getting-started-step" key={step}>
+                  <span className={styles.stepNumber} aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <span className={styles.stepText}>{step}</span>
+                </li>
+              ))}
+            </ol>
+            <div className={styles.gettingStartedFooter}>
+              <Anchor
+                href="/dashboard/onboarding"
+                className={styles.gettingStartedGuideLink}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onNavigateToOnboarding();
+                }}
+              >
+                Read the publisher onboarding guide →
+              </Anchor>
+            </div>
+          </Stack>
         </Card>
       ) : null}
 
@@ -181,7 +188,7 @@ export function DashboardHome({
           color={hasCompany ? "green" : "yellow"}
           action={
             <Button
-              data-dashboard-action="compact"
+              data-dashboard-action="restrained"
               data-testid="dashboard-define-profile-action"
               leftSection={<Building2 size={16} />}
               onClick={onNavigateToCompany}
@@ -201,7 +208,7 @@ export function DashboardHome({
           color={hasCompany ? "yellow" : "orange"}
           action={
             <Button
-              data-dashboard-action="compact"
+              data-dashboard-action="restrained"
               data-testid="dashboard-verify-profile-action"
               disabled
               {...primaryActionProps}
