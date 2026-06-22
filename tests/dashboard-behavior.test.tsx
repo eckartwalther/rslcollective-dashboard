@@ -29,7 +29,7 @@ const gettingStartedHeading = "Turn AI use of your content into licensing revenu
 const gettingStartedSteps = [
   "Join the RSL Collective and accept the collective licensing terms.",
   "Publish and register RSL declarations for eligible content.",
-  "Receive reporting and royalty payments when licensees use your content."
+  "Receive reporting and royalty payments when AI companies use your content."
 ];
 
 function authenticatedSession(overrides: Partial<AuthenticatedSession["user"]> = {}): SessionResponse {
@@ -84,6 +84,16 @@ function getWorkflowCard(name: string) {
 
   expect(card).not.toBeNull();
   return card as HTMLElement;
+}
+
+function expectComingSoonNextToVerifyAction() {
+  const verifyButton = screen.getByTestId("dashboard-verify-profile-action");
+  const actionRow = verifyButton.parentElement;
+
+  expect(actionRow).not.toBeNull();
+  expect(within(actionRow as HTMLElement).getByText("Coming soon")).toBeInTheDocument();
+  expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+  expect(screen.queryByText("Verification is coming soon.")).not.toBeInTheDocument();
 }
 
 describe("dashboard behavior", () => {
@@ -214,6 +224,7 @@ describe("dashboard behavior", () => {
       "restrained"
     );
     expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
+    expectComingSoonNextToVerifyAction();
     expect(getWorkflowCard("Create publisher profile")).toHaveAttribute("data-card-state", "not-started");
     expect(getWorkflowCard("Complete verification")).toHaveAttribute("data-card-state", "pending-profile");
     expect(getWorkflowCard("Accept licensing terms")).toHaveAttribute("data-card-state", "pending-verification");
@@ -378,7 +389,7 @@ describe("dashboard behavior", () => {
     expect(screen.queryByText("Example Media Inc.")).not.toBeInTheDocument();
     expect(screen.getByText("Create publisher profile")).toBeInTheDocument();
     expect(
-      screen.getByText("Register your organization and prepare your account for licensing.")
+      screen.getByText("Register your company and prepare your account for collective licensing.")
     ).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Edit publisher profile" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
@@ -394,6 +405,7 @@ describe("dashboard behavior", () => {
       screen.getByText("Confirm your company's eligibility to license content through the RSL Collective.")
     ).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-verify-profile-action")).toBeDisabled();
+    expectComingSoonNextToVerifyAction();
     expect(screen.getByText("Accept licensing terms")).toBeInTheDocument();
     expect(
       screen.getByText("Review and accept the terms that allow the Collective to license eligible content on your behalf.")
@@ -403,10 +415,6 @@ describe("dashboard behavior", () => {
     expect(screen.getByText("Register content")).toBeInTheDocument();
     expect(
       screen.getByText("Enroll the websites, subdomains, and RSL declarations you want included in collective licensing.")
-    ).toBeInTheDocument();
-    expect(screen.getByText("Manage licensees")).toBeInTheDocument();
-    expect(
-      screen.getByText("Exclude specific participating licensees from access to selected licensable content.")
     ).toBeInTheDocument();
     expect(screen.getByText("View reports")).toBeInTheDocument();
     expect(screen.getByText("Track usage, licensing activity, settlements, and royalty reporting.")).toBeInTheDocument();
@@ -430,7 +438,6 @@ describe("dashboard behavior", () => {
     const text = document.body.textContent ?? "";
 
     expect(text).not.toMatch(/disabled/i);
-    expect(text).not.toMatch(/coming soon/i);
     expect(text).not.toMatch(/future module/i);
     expect(text).not.toMatch(/not configured yet/i);
     expect(text).not.toMatch(/once enabled/i);
@@ -456,6 +463,7 @@ describe("dashboard behavior", () => {
     renderDashboard();
 
     await screen.findByRole("heading", { name: gettingStartedHeading });
+    expectComingSoonNextToVerifyAction();
     fireEvent.click(screen.getByRole("button", { name: "Verify profile" }));
 
     expect(window.location.pathname).toBe("/dashboard");

@@ -21,6 +21,7 @@ type StatusCardProps = {
   cardState?: WorkflowCardState;
   accentColor?: string;
   action?: ReactNode;
+  actionHint?: ReactNode;
 };
 
 export function StatusCard({
@@ -31,7 +32,8 @@ export function StatusCard({
   color = "gray",
   cardState = "pending-verification",
   accentColor = "var(--mantine-color-gray-4)",
-  action
+  action,
+  actionHint
 }: StatusCardProps) {
   return (
     <Card
@@ -70,7 +72,16 @@ export function StatusCard({
         <Text size="sm" className={styles.workflowDescription}>
           {description}
         </Text>
-        {action}
+        {action ? (
+          <div className={styles.cardActionRow}>
+            {action}
+            {actionHint ? (
+              <span className={styles.actionHint}>
+                {actionHint}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </Stack>
     </Card>
   );

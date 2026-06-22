@@ -52,7 +52,7 @@ const dashboardCopy = {
   cards: {
     publisherProfile: {
       title: "Create publisher profile",
-      description: "Register your organization and prepare your account for licensing."
+      description: "Register your company and prepare your account for collective licensing."
     },
     verification: {
       title: "Complete verification",
@@ -68,11 +68,6 @@ const dashboardCopy = {
       title: "Register content",
       description: "Enroll the websites, subdomains, and RSL declarations you want included in collective licensing.",
       icon: Library
-    },
-    {
-      title: "Manage licensees",
-      description: "Exclude specific participating licensees from access to selected licensable content.",
-      icon: Ban
     },
     {
       title: "View reports",
@@ -98,7 +93,7 @@ const primaryActionProps = {
 const gettingStartedSteps = [
   "Join the RSL Collective and accept the collective licensing terms.",
   "Publish and register RSL declarations for eligible content.",
-  "Receive reporting and royalty payments when licensees use your content."
+  "Receive reporting and royalty payments when AI companies use your content."
 ];
 
 const workflowAccentColorByState: Record<WorkflowCardState, string> = {
@@ -225,6 +220,7 @@ export function DashboardHome({
             color={hasCompany ? "gray" : "orange"}
             cardState={verificationState}
             accentColor={workflowAccentColorByState[verificationState]}
+            actionHint="Coming soon"
             action={
               <Button
                 data-dashboard-action="restrained"
