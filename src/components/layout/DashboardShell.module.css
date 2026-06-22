@@ -99,3 +99,43 @@
 .signOutButton svg {
   color: #2563eb;
 }
+
+.footer {
+  align-items: center;
+  color: var(--mantine-color-gray-6);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 12px 20px;
+  justify-content: center;
+  line-height: 20px;
+  padding: 10px 0 2px;
+  text-align: center;
+}
+
+.footerCopyright {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.footerNav {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.footerLink {
+  color: var(--mantine-color-gray-6);
+  font-size: inherit;
+  font-weight: 500;
+  line-height: inherit;
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  color: var(--mantine-color-blue-7);
+  text-decoration: underline;
+}

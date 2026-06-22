@@ -73,6 +73,13 @@
   width: 100%;
 }
 
+.gettingStartedFooterLinks {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .gettingStartedGuideLink {
   color: #3451b2;
   font-size: 14px;

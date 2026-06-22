@@ -172,16 +172,24 @@ export function DashboardHome({
               ))}
             </ol>
             <div className={styles.gettingStartedFooter}>
-              <Anchor
-                href="/dashboard/onboarding"
-                className={styles.gettingStartedGuideLink}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onNavigateToOnboarding();
-                }}
-              >
-                Read the publisher onboarding guide →
-              </Anchor>
+              <div className={styles.gettingStartedFooterLinks}>
+                <Anchor
+                  href="/dashboard/onboarding"
+                  className={styles.gettingStartedGuideLink}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onNavigateToOnboarding();
+                  }}
+                >
+                  Read the publisher onboarding guide →
+                </Anchor>
+                <Anchor
+                  href="https://rslcollective.org/partners"
+                  className={styles.gettingStartedGuideLink}
+                >
+                  Onboard through a partner platform →
+                </Anchor>
+              </div>
             </div>
           </Stack>
         </Card>

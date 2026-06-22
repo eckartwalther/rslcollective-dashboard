@@ -244,6 +244,19 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
           ) : null}
           {activeView === "company" ? <CompanyProfileTab authenticated /> : null}
           {activeView === "account" ? <AccountTab user={user} onSignOut={onSignOut} /> : null}
+          <footer className={styles.footer}>
+            <Text component="span" className={styles.footerCopyright}>
+              Copyright © 2026 RSL Internet Collective
+            </Text>
+            <nav aria-label="Legal" className={styles.footerNav}>
+              <a className={styles.footerLink} href="https://rslcollective.org/legal/tos">
+                Terms
+              </a>
+              <a className={styles.footerLink} href="https://rslcollective.org/legal/privacy">
+                Privacy
+              </a>
+            </nav>
+          </footer>
         </Stack>
       </AppShell.Main>
     </AppShell>

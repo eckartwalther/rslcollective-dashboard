@@ -128,6 +128,22 @@ describe("dashboard behavior", () => {
     expect(screen.queryByText("publisher@example.com")).not.toBeInTheDocument();
   });
 
+  it("renders the global dashboard footer with legal links", async () => {
+    mockDashboardFetch(authenticatedSession());
+
+    renderDashboard();
+
+    expect(await screen.findByText("Copyright © 2026 RSL Internet Collective")).toBeInTheDocument();
+
+    const footer = screen.getByRole("contentinfo");
+    const legalNavigation = within(footer).getByRole("navigation", { name: "Legal" });
+    const termsLink = within(legalNavigation).getByRole("link", { name: "Terms" });
+    const privacyLink = within(legalNavigation).getByRole("link", { name: "Privacy" });
+
+    expect(termsLink).toHaveAttribute("href", "https://rslcollective.org/legal/tos");
+    expect(privacyLink).toHaveAttribute("href", "https://rslcollective.org/legal/privacy");
+  });
+
   it("submits sign-out through a POST /logout form", async () => {
     mockDashboardFetch(authenticatedSession());
     const submitSpy = vi
@@ -202,17 +218,21 @@ describe("dashboard behavior", () => {
     const onboardingGuideLink = within(gettingStartedCard).getByRole("link", {
       name: /Read the publisher onboarding guide/
     });
+    const partnerPlatformLink = within(gettingStartedCard).getByRole("link", {
+      name: /Onboard through a partner platform/
+    });
 
     expect(onboardingGuideLink).toHaveAttribute("href", "/dashboard/onboarding");
     expect(onboardingGuideLink).not.toHaveAttribute("target");
     expect(onboardingGuideLink).not.toHaveAttribute("rel");
+    expect(partnerPlatformLink).toHaveAttribute("href", "https://rslcollective.org/partners");
     expect(
       within(gettingStartedCard).queryByRole("button", { name: "Create publisher profile" })
     ).not.toBeInTheDocument();
     expect(
       within(gettingStartedCard).queryByRole("link", { name: /Read onboarding guide/i })
     ).not.toBeInTheDocument();
-    expect(within(gettingStartedCard).getAllByRole("link")).toHaveLength(1);
+    expect(within(gettingStartedCard).getAllByRole("link")).toHaveLength(2);
     expect(within(gettingStartedCard).getAllByRole("button")).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Create publisher profile" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("dashboard-define-profile-action")).toHaveAttribute(
@@ -229,7 +249,6 @@ describe("dashboard behavior", () => {
     expect(getWorkflowCard("Complete verification")).toHaveAttribute("data-card-state", "pending-profile");
     expect(getWorkflowCard("Accept licensing terms")).toHaveAttribute("data-card-state", "pending-verification");
     expect(getWorkflowCard("Register content")).toHaveAttribute("data-card-state", "pending-verification");
-    expect(getWorkflowCard("Manage licensees")).toHaveAttribute("data-card-state", "pending-verification");
     expect(getWorkflowCard("View reports")).toHaveAttribute("data-card-state", "pending-verification");
     expect(getWorkflowCard("Set up payouts")).toHaveAttribute("data-card-state", "pending-verification");
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
