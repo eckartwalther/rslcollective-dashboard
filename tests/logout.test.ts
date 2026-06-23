@@ -5,13 +5,14 @@ import {
   hashSessionToken,
   type SessionStore
 } from "../worker/lib/session";
-import type { SessionData, SessionRow, UserRow, WorkosUserData } from "../worker/lib/db";
-import type { WorkosAuthEnv, WorkosAuthenticatedUser } from "../worker/lib/workos";
+import type { AuthenticatedUserData, SessionData, SessionRow, UserRow } from "../worker/lib/db";
+import type { Auth0AuthenticatedUser, Auth0AuthEnv } from "../worker/lib/auth0";
 
 const productionEnv = {
   ENVIRONMENT: "production",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
-  WORKOS_CLIENT_ID: "client_test",
+  AUTH0_ISSUER_BASE_URL: "https://tenant.example.auth0.com",
+  AUTH0_CLIENT_ID: "client_test",
   SESSION_SECRET: "test-session-secret",
   DB: {} as D1Database
 };
@@ -22,7 +23,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -37,7 +37,7 @@ function createHarness(options: {
   let session = options.session ?? null;
   const calls = {
     deletedSessionId: null as string | null,
-    logoutSessionId: null as string | null
+    logoutEnv: null as Auth0AuthEnv | null
   };
   const sessionStore: SessionStore = {
     createSession: async (_session: SessionData) => null,
@@ -51,16 +51,24 @@ function createHarness(options: {
   };
   const deps: AuthRouteDeps = {
     createSessionStore: () => sessionStore,
-    exchangeAuthorizationCode: async (_env: WorkosAuthEnv, _code: string): Promise<WorkosAuthenticatedUser> => {
+    exchangeAuthorizationCode: async (
+      _env: Auth0AuthEnv,
+      _code: string,
+      _nonce: string
+    ): Promise<Auth0AuthenticatedUser> => {
       throw new Error("Not used in logout tests.");
     },
-    getUserByWorkosUserId: async () => null,
-    createUserFromWorkos: async (_db: D1Database, _user: WorkosUserData): Promise<UserRow | null> =>
-      null,
-    updateUserFromWorkos: async (_db: D1Database, _user: WorkosUserData): Promise<UserRow | null> =>
-      null,
-    getLogoutUrl: (_env, sessionId) => {
-      calls.logoutSessionId = sessionId ?? null;
+    getUserByAuthIdentity: async () => null,
+    createUserFromAuthIdentity: async (
+      _db: D1Database,
+      _user: AuthenticatedUserData
+    ): Promise<UserRow | null> => null,
+    updateUserFromAuthIdentity: async (
+      _db: D1Database,
+      _user: AuthenticatedUserData
+    ): Promise<UserRow | null> => null,
+    getLogoutUrl: (env) => {
+      calls.logoutEnv = env;
       return options.logoutUrl ?? null;
     }
   };
@@ -103,7 +111,8 @@ describe("POST /logout", () => {
 
   it("accepts matching DASHBOARD_BASE_URL Origin in production", async () => {
     const { routes } = createHarness({
-      logoutUrl: "https://api.workos.com/user_management/logout?client_id=client_test"
+      logoutUrl:
+        "https://tenant.example.auth0.com/v2/logout?client_id=client_test&returnTo=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin"
     });
     const response = await logoutRequest(routes, {
       headers: { Origin: "https://dashboard.rslcollective.org" }
@@ -156,7 +165,8 @@ describe("POST /logout", () => {
     const tokenHash = await hashSessionToken(token);
     const { routes, calls } = createHarness({
       session: createSessionRow({ token_hash: tokenHash }),
-      logoutUrl: "https://api.workos.com/user_management/logout?client_id=client_test"
+      logoutUrl:
+        "https://tenant.example.auth0.com/v2/logout?client_id=client_test&returnTo=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin"
     });
     const response = await logoutRequest(routes, {
       headers: {
@@ -171,7 +181,8 @@ describe("POST /logout", () => {
 
   it("still clears the cookie if no valid local session exists", async () => {
     const { routes, calls } = createHarness({
-      logoutUrl: "https://api.workos.com/user_management/logout?client_id=client_test",
+      logoutUrl:
+        "https://tenant.example.auth0.com/v2/logout?client_id=client_test&returnTo=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin",
       session: null
     });
     const response = await logoutRequest(routes, {
@@ -188,7 +199,8 @@ describe("POST /logout", () => {
 
   it("clears __Host-rsl_dashboard_session with required attributes", async () => {
     const { routes } = createHarness({
-      logoutUrl: "https://api.workos.com/user_management/logout?client_id=client_test"
+      logoutUrl:
+        "https://tenant.example.auth0.com/v2/logout?client_id=client_test&returnTo=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin"
     });
     const response = await logoutRequest(routes, {
       headers: { Origin: "https://dashboard.rslcollective.org" }
@@ -223,8 +235,9 @@ describe("POST /logout", () => {
     expect(calls.deletedSessionId).toBe("ses_logout");
   });
 
-  it("redirects through WorkOS logout URL when available", async () => {
-    const logoutUrl = "https://api.workos.com/user_management/logout?client_id=client_test";
+  it("redirects through Auth0 logout URL when available", async () => {
+    const logoutUrl =
+      "https://tenant.example.auth0.com/v2/logout?client_id=client_test&returnTo=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin";
     const { routes } = createHarness({ logoutUrl });
     const response = await logoutRequest(routes, {
       headers: { Origin: "https://dashboard.rslcollective.org" }
@@ -234,11 +247,11 @@ describe("POST /logout", () => {
     expect(response.headers.get("Location")).toBe(logoutUrl);
   });
 
-  it("falls back to /login when no WorkOS session ID is stored", async () => {
+  it("falls back to /login when Auth0 logout URL is unavailable", async () => {
     const token = "legacy-logout-token";
     const tokenHash = await hashSessionToken(token);
     const { routes, calls } = createHarness({
-      session: createSessionRow({ token_hash: tokenHash, workos_session_id: null }),
+      session: createSessionRow({ token_hash: tokenHash }),
       logoutUrl: null
     });
     const response = await logoutRequest(routes, {
@@ -250,44 +263,8 @@ describe("POST /logout", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/login");
-    expect(calls.logoutSessionId).toBeNull();
+    expect(calls.logoutEnv?.AUTH0_CLIENT_ID).toBe("client_test");
     expect(calls.deletedSessionId).toBe("ses_logout");
-  });
-
-  it("uses the stored WorkOS session ID when building the logout URL", async () => {
-    const token = "logout-token";
-    const tokenHash = await hashSessionToken(token);
-    const logoutUrl =
-      "https://api.workos.com/user_management/sessions/logout?session_id=workos_session_test&return_to=https%3A%2F%2Fdashboard.rslcollective.org%2Flogin";
-    const { routes, calls } = createHarness({
-      session: createSessionRow({
-        token_hash: tokenHash,
-        workos_session_id: "workos_session_test"
-      }),
-      logoutUrl
-    });
-    const response = await logoutRequest(routes, {
-      headers: {
-        Origin: "https://dashboard.rslcollective.org",
-        Cookie: `${SESSION_COOKIE_NAME}=${token}`
-      }
-    });
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe(logoutUrl);
-    expect(calls.logoutSessionId).toBe("workos_session_test");
-    expect(calls.deletedSessionId).toBe("ses_logout");
-  });
-
-  it("falls back to /login when WorkOS logout URL is unavailable", async () => {
-    const { routes } = createHarness({ logoutUrl: null });
-    const response = await logoutRequest(routes, {
-      env: { ENVIRONMENT: "development", DB: {} as D1Database },
-      headers: { Origin: "http://localhost:8787" }
-    });
-
-    expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("/login");
   });
 
   it("does not implement GET /logout", async () => {

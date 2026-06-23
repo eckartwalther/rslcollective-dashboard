@@ -164,7 +164,7 @@ describe("dashboard behavior", () => {
     });
   });
 
-  it("does not render WorkOS IDs, session IDs, or token hashes", async () => {
+  it("does not render provider IDs, session IDs, or token hashes", async () => {
     mockDashboardFetch({
       authenticated: true,
       user: {
@@ -181,7 +181,7 @@ describe("dashboard behavior", () => {
     await screen.findAllByText("jane@example.com");
     const text = document.body.textContent ?? "";
 
-    expect(text).not.toContain("workos_user");
+    expect(text).not.toContain("auth0|");
     expect(text).not.toContain("ses_test");
     expect(text).not.toContain("token_hash");
   });

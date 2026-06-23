@@ -261,7 +261,6 @@ export async function createLocalSession(
   store: SessionStore,
   userId: string,
   env: SessionEnv,
-  workosSessionId: string | null,
   now = new Date()
 ): Promise<CreateLocalSessionResult> {
   const token = createSessionToken();
@@ -270,7 +269,6 @@ export async function createLocalSession(
   const session = await store.createSession({
     userId,
     tokenHash,
-    workosSessionId,
     expiresAt
   });
   const cookie = createSessionCookie(token, {

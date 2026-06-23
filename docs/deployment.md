@@ -4,43 +4,16 @@ This app deploys as a single Cloudflare Worker that serves both the Vite SPA ass
 
 ## Cloudflare Account Targeting
 
-`wrangler.jsonc` is the local/default Worker config used by `pnpm worker:dev`. It must remain local-safe and must not include the production `dashboard.rslcollective.org` route or `custom_domain` entry. It must include:
+`wrangler.jsonc` is the local/default Worker config used by `pnpm worker:dev`. It must remain local-safe and must not include the production `dashboard.rslcollective.org` route or `custom_domain` entry. It must include Worker-first routing for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
 
-```jsonc
-{
-  "name": "rslcollective-dashboard",
-  "main": "worker/index.ts",
-  "account_id": "<CLOUDFLARE_ACCOUNT_ID_FOR_RSLCOLLECTIVE_ORG_ACCOUNT>",
-  "compatibility_date": "2026-06-11",
-  "assets": {
-    "directory": "./dist/",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/",
-      "/register",
-      "/login",
-      "/auth/*",
-      "/logout",
-      "/api/*"
-    ]
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "rsl-collective-dashboard",
-      "database_id": "<D1_DATABASE_ID_FROM_SAME_CLOUDFLARE_ACCOUNT>"
-    }
-  ]
-}
-```
-
-`wrangler.production.jsonc` is the explicit production deploy config used by `pnpm worker:deploy`. It mirrors the Worker, assets, and D1 bindings above and adds the production custom-domain route:
+`wrangler.production.jsonc` is the explicit production deploy config used by `pnpm worker:deploy`. It mirrors the Worker, assets, and D1 bindings and adds the production custom-domain route:
 
 ```jsonc
 {
   "vars": {
-    "WORKOS_REDIRECT_URI": "https://dashboard.rslcollective.org/auth/callback",
+    "AUTH0_ISSUER_BASE_URL": "https://login.rslcollective.org",
+    "AUTH0_CLIENT_ID": "Rh6L36YoEzjBtpBVTy2w8gqR03WxgdcN",
+    "AUTH0_CALLBACK_URL": "https://dashboard.rslcollective.org/auth/callback",
     "DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
     "ENVIRONMENT": "production"
   },
@@ -63,43 +36,32 @@ pnpm exec wrangler whoami
 
 Confirm the active Wrangler account matches `account_id` in `wrangler.production.jsonc`. Local development may use `wrangler login`. CI or scripted deployment should use `CLOUDFLARE_API_TOKEN` and, where useful, `CLOUDFLARE_ACCOUNT_ID`.
 
-## Deployment Credentials
-
-Cloudflare deployment credentials are Wrangler/system credentials, not application runtime secrets.
-
-- `CLOUDFLARE_API_TOKEN` is used by Wrangler for deployment, D1 migrations, and route updates.
-- `CLOUDFLARE_ACCOUNT_ID` may be used by CI scripts for account targeting, while `wrangler.production.jsonc` still makes the production target explicit.
-- The Cloudflare API token must be scoped to the intended Cloudflare account.
-- The token needs permissions for Workers deployment, D1 migrations, and the `dashboard.rslcollective.org` Worker route.
-- Never commit Cloudflare API tokens or credentials.
-- Do not prefix Cloudflare deployment credentials with `VITE_`.
-- Do not expose Cloudflare credentials to browser code.
-
 ## Runtime Secrets And Variables
 
 Required Worker runtime bindings:
 
 - `ASSETS` Workers Assets binding
 - `DB` D1 binding
-- `WORKOS_CLIENT_ID`
-- `WORKOS_API_KEY`
-- `WORKOS_REDIRECT_URI`
+- `AUTH0_ISSUER_BASE_URL`
+- `AUTH0_CLIENT_ID`
+- `AUTH0_CALLBACK_URL`
+- `AUTH0_CLIENT_SECRET`
 - `SESSION_SECRET`
 - `DASHBOARD_BASE_URL`
 - `ENVIRONMENT=production`
 
-`WORKOS_API_KEY` and `SESSION_SECRET` must be stored as Worker secrets. `WORKOS_CLIENT_ID` may be stored as either a Worker variable or a Worker secret; it is not as sensitive as the API key, so prefer a variable unless the deployment process has a reason to hide it. `WORKOS_REDIRECT_URI`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT` are production variables in `wrangler.production.jsonc`.
+`AUTH0_CLIENT_SECRET` and `SESSION_SECRET` must be stored as Worker secrets. `AUTH0_CLIENT_ID`, `AUTH0_ISSUER_BASE_URL`, `AUTH0_CALLBACK_URL`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT` are production variables in `wrangler.production.jsonc`.
 
 `ENVIRONMENT=production` is required in production. The Worker checks this value to set production `Secure` session cookies, require `Origin` on protected mutating requests, and reject mismatched production origins. Do not set `ENVIRONMENT` with `wrangler secret put`.
 
-`wrangler.jsonc` remains local/dev-safe and does not include production vars. If this project later introduces named Wrangler environments, production-only values should live under the production environment's `vars` block rather than the local config.
-
-Do not expose WorkOS secrets through Vite client variables. Do not put WorkOS or Cloudflare credentials in `VITE_` variables.
+Do not expose Auth0 access tokens, ID tokens, refresh tokens, or client secrets through Vite client variables. Do not put Auth0 or Cloudflare credentials in `VITE_` variables.
 
 Production values:
 
 ```txt
-WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback
+AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org
+AUTH0_CLIENT_ID=<Auth0 Production Regular Web Application Client ID>
+AUTH0_CALLBACK_URL=https://dashboard.rslcollective.org/auth/callback
 DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
 ENVIRONMENT=production
 ```
@@ -107,30 +69,45 @@ ENVIRONMENT=production
 Local values:
 
 ```txt
-WORKOS_REDIRECT_URI=http://localhost:8787/auth/callback
+AUTH0_ISSUER_BASE_URL=https://<tenant>.auth0.com
+AUTH0_CLIENT_ID=<Auth0 Development Regular Web Application Client ID>
 DASHBOARD_BASE_URL=http://localhost:8787
 ENVIRONMENT=development
 ```
 
-For local development, `ENVIRONMENT` may also be omitted because development is the default behavior. Development Origin validation accepts `DASHBOARD_BASE_URL` when configured and local Worker origins on `localhost` or `127.0.0.1` using HTTP or HTTPS on ports `8787` and `8788`. Production still requires the request `Origin` to match `DASHBOARD_BASE_URL`.
-
-`WORKOS_LOGOUT_URI` is deprecated and is not used by the app. `POST /logout` uses the stored WorkOS session ID to build a WorkOS logout URL with a return target of `${DASHBOARD_BASE_URL}/login`. If an older local dashboard session has no stored WorkOS session ID, logout still clears the local session and falls back safely to `/login`.
-
-Session cookies are environment-specific:
-
-- Production uses `__Host-rsl_dashboard_session` with `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`.
-- Local HTTP development uses `rsl_dashboard_session` with `HttpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`, but without `Secure`.
-
-This split is intentional. The `__Host-` prefix and `Secure` attribute are required for the production security model, but plain `http://localhost:8787` development cannot rely on browsers, especially Safari, persisting a Secure `__Host-` cookie. Production cookie security is unchanged.
+For local development, `AUTH0_CALLBACK_URL` may be omitted so the Worker derives `http://localhost:8787/auth/callback` from `DASHBOARD_BASE_URL`. Development Origin validation accepts `DASHBOARD_BASE_URL` when configured and local Worker origins on `localhost` or `127.0.0.1` using HTTP or HTTPS on ports `8787` and `8788`. Production still requires the request `Origin` to match `DASHBOARD_BASE_URL`.
 
 Secret setup command patterns:
 
 ```sh
-pnpm exec wrangler secret put WORKOS_API_KEY --config wrangler.production.jsonc
+pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --config wrangler.production.jsonc
 pnpm exec wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
 ```
 
-If `WORKOS_CLIENT_ID` is managed as a secret instead of a variable, set it with the same production config. Do not set `WORKOS_LOGOUT_URI`; the app does not use it. Keep all runtime configuration out of browser code unless it is deliberately browser-safe and uses a `VITE_` prefix.
+## Auth0
+
+Use an Auth0 Regular Web Application. The Cloudflare Worker is the confidential OIDC client and performs the Authorization Code Flow server-side. React must not use the Auth0 SPA SDK and must not receive Auth0 tokens.
+
+Production Auth0 application configuration:
+
+- Application type: Regular Web Application.
+- Allowed Callback URLs: `https://dashboard.rslcollective.org/auth/callback`.
+- Allowed Logout URLs: `https://dashboard.rslcollective.org/login`.
+- Application Login URI: `https://dashboard.rslcollective.org/login`.
+- Allowed Web Origins: secondary for this architecture; add `https://dashboard.rslcollective.org` only if future browser-side Auth0 SDK behavior is introduced.
+- Grant types: Authorization Code.
+- ID token signing algorithm: RS256.
+- Universal Login: enabled and branded in Auth0.
+
+Custom domain setup for production:
+
+- Configure `login.rslcollective.org` in Auth0 Branding or Custom Domains.
+- Use Auth0-managed certificates unless there is a specific reason to self-manage certificates.
+- Add the Auth0-provided CNAME in Cloudflare as DNS-only, not proxied, at least through validation.
+- Keep the CNAME present for certificate renewal.
+- After validation, set `AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org`.
+
+Staging should use a separate Auth0 tenant or application and separate Worker/D1 runtime values. Auth0 recommends separate tenants for development, staging, and production isolation. A staging custom login domain such as `login-staging.rslcollective.org` is recommended if staging needs to mirror production branding.
 
 ## D1
 
@@ -138,7 +115,7 @@ Cloudflare requirements:
 
 - D1 database `rsl-collective-dashboard` exists in the same Cloudflare account as `account_id`.
 - D1 binding name is `DB`.
-- `d1_databases[0].database_id` in both `wrangler.jsonc` and `wrangler.production.jsonc` belongs to that same account.
+- `d1_databases[0].database_id` in both Wrangler configs belongs to that same account.
 - Remote migration is applied before production smoke testing.
 
 Commands:
@@ -155,7 +132,6 @@ Cloudflare requirements:
 
 - `dashboard.rslcollective.org` routes to this Worker.
 - The production route exists only in `wrangler.production.jsonc`; the local/default `wrangler.jsonc` intentionally has no production `routes` or `custom_domain` entry.
-- The Worker is deployed to the Cloudflare account that controls `rslcollective.org`.
 - Workers Assets SPA fallback is configured with `not_found_handling: "single-page-application"`.
 - `run_worker_first` is configured for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
 - `/dashboard` and nested dashboard routes are served by the SPA fallback.
@@ -174,7 +150,7 @@ pnpm worker:deploy
 
 ## Local Worker Smoke Tests
 
-Use Wrangler for local auth/API route testing. Vite-only development is useful for UI work, but it does not exercise Worker-first routes, D1 bindings, Origin behavior, WorkOS redirects, or SPA asset fallback.
+Use Wrangler for local auth/API route testing. Vite-only development is useful for UI work, but it does not exercise Worker-first routes, D1 bindings, Origin behavior, Auth0 redirects, or SPA asset fallback.
 
 Start the local Worker:
 
@@ -182,8 +158,6 @@ Start the local Worker:
 pnpm db:migrate:local
 pnpm worker:dev
 ```
-
-`pnpm worker:dev` runs `wrangler dev --config wrangler.jsonc`, so local requests should stay under `localhost:8787`. It must not use the production custom-domain route from `wrangler.production.jsonc`.
 
 Then run these checks against the local Worker:
 
@@ -206,45 +180,21 @@ Expected routing shape:
 - `/`, `/register`, `/login`, `/auth/callback`, `/logout`, and `/api/*` are Worker-handled.
 - `/auth/callback` must return a Worker response and must not be served by the SPA fallback.
 - `/dashboard` is served by the SPA fallback.
-- Wrangler request logs for the local curl requests should show `http://localhost:8787/...`, not `http://dashboard.rslcollective.org/...`.
-- Without local WorkOS settings, `/register` and `/login` may fail clearly with a WorkOS configuration error instead of redirecting.
+- Without local Auth0 settings, `/register` and `/login` may fail clearly with an Auth0 configuration error instead of redirecting.
 - Without an authenticated local session, `/api/session` returns unauthenticated and `/api/company` returns unauthenticated. The local PUT request above should return `401 Unauthorized`, not `403 Forbidden` for Origin.
-
-## WorkOS/AuthKit
-
-WorkOS production requirements:
-
-- Use the WorkOS Production environment and Production Client ID/API Key.
-- Use WorkOS default hosted AuthKit for the first production deploy.
-- Use the default WorkOS email sender for the first production deploy.
-- Callback URL is configured as `https://dashboard.rslcollective.org/auth/callback`.
-- Sign-in endpoint is configured as `https://dashboard.rslcollective.org/login`.
-- Sign-out/logout return URL is configured as `https://dashboard.rslcollective.org/login`.
-- App homepage is configured as `https://dashboard.rslcollective.org/`.
-- Custom AuthKit domain `login.rslcollective.org` is an optional future branding step, not required for the first production deploy.
-- Custom email sender/domain `no-reply@mail.rslcollective.org` is an optional future branding step, not required for the first production deploy.
-- WorkOS Organizations are not used in this phase.
-
-Current logout behavior:
-
-- `POST /logout` clears the current environment's session cookie and invalidates the local D1 session when present.
-- In local development, `POST /logout` also clears a stale production `__Host-rsl_dashboard_session` cookie defensively.
-- If the local D1 session has a `workos_session_id`, the Worker redirects through WorkOS hosted logout with `returnTo` set to `${DASHBOARD_BASE_URL}/login`.
-- If no WorkOS session ID exists, logout falls back safely to `/login` after clearing the local session.
-- `GET /logout` is not implemented; logout remains POST-only.
 
 ## Production Smoke Test
 
 1. Visit `https://dashboard.rslcollective.org/`.
 2. Confirm unauthenticated access redirects to `/login`.
-3. Complete AuthKit login or registration.
+3. Complete Auth0 Universal Login or registration.
 4. Confirm the callback returns through `/auth/callback` and lands on `/dashboard`.
 5. Confirm a new user lands on Company Profile.
 6. Create a company profile.
 7. Refresh and confirm the profile persists.
 8. Sign out.
-9. Confirm the local session is cleared.
-10. Login again.
+9. Confirm the local session is cleared and the browser redirects through Auth0 logout to `/login`.
+10. Log in again.
 11. Confirm the company profile loads.
 
 ## Pre-Deploy Checklist
@@ -254,14 +204,12 @@ Current logout behavior:
 - `pnpm test` passes.
 - `pnpm exec wrangler whoami` shows the intended Cloudflare account.
 - `wrangler.production.jsonc` `account_id` is the Cloudflare account that controls `rslcollective.org`.
-- Any placeholder account or D1 IDs in `wrangler.jsonc` and `wrangler.production.jsonc` have been replaced before deploy.
+- Any placeholder account, D1, or Auth0 IDs in Wrangler configs have been replaced before deploy.
 - D1 `database_id` belongs to the same Cloudflare account.
 - Remote D1 migration is applied.
 - Worker secrets and production runtime variables are set.
-- WorkOS callback URL is set.
-- WorkOS sign-in endpoint is set.
-- WorkOS sign-out/logout return URL is set to `/login`.
-- WorkOS app homepage is set.
-- WorkOS custom AuthKit domain and custom email sender are not required for first deploy.
+- Auth0 callback URL is allow-listed.
+- Auth0 logout return URL is allow-listed.
+- Auth0 custom domain `login.rslcollective.org` is verified with DNS-only CNAME while validating Auth0-managed certificates.
 - `dashboard.rslcollective.org` route is active.
 - `/auth/callback` is tested as Worker-handled.

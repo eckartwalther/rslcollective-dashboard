@@ -20,7 +20,8 @@ CREATE TABLE companies (
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
-  workos_user_id TEXT NOT NULL UNIQUE,
+  auth_provider TEXT NOT NULL,
+  auth_subject TEXT NOT NULL,
   company_id TEXT,
   email TEXT NOT NULL,
   first_name TEXT,
@@ -32,6 +33,7 @@ CREATE TABLE users (
   FOREIGN KEY (company_id) REFERENCES companies(id)
 );
 
+CREATE UNIQUE INDEX idx_users_auth_identity ON users(auth_provider, auth_subject);
 CREATE INDEX idx_users_company_id ON users(company_id);
 
 CREATE TABLE sessions (

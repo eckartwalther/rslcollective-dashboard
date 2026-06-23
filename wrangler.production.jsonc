@@ -5,8 +5,9 @@
 	"account_id": "a1c2ba23b7e8773d87661d35ddca3fe7",
 	"compatibility_date": "2026-06-11",
 	"vars": {
-    "WORKOS_CLIENT_ID": "client_01KTW9J7G7M2348V3EMQQS8NCT",
-		"WORKOS_REDIRECT_URI": "https://dashboard.rslcollective.org/auth/callback",
+    "AUTH0_ISSUER_BASE_URL": "https://login.rslcollective.org",
+		"AUTH0_CLIENT_ID": "Rh6L36YoEzjBtpBVTy2w8gqR03WxgdcN",
+		"AUTH0_CALLBACK_URL": "https://dashboard.rslcollective.org/auth/callback",
 		"DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
 		"ENVIRONMENT": "production"
 	},

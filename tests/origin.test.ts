@@ -7,7 +7,7 @@ import type { CompanyData, CompanyRow, SessionData, SessionRow, UserRow } from "
 const productionEnv = {
   ENVIRONMENT: "production",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
-  WORKOS_CLIENT_ID: "client_test",
+  AUTH0_CLIENT_ID: "client_test",
   DB: {} as D1Database
 };
 
@@ -394,7 +394,8 @@ function createAuthenticatedCompanyRoute() {
 function createUser(): UserRow {
   return {
     id: "usr_test",
-    workos_user_id: "workos_test",
+    auth_provider: "auth0",
+    auth_subject: "auth0|user_test",
     company_id: null,
     email: "publisher@example.com",
     first_name: "Jane",
@@ -412,7 +413,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",

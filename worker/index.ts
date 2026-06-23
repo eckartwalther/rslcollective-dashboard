@@ -8,10 +8,12 @@ import { sessionRoutes } from "./routes/session";
 type Bindings = {
   ASSETS: Fetcher;
   DB: D1Database;
+  AUTH0_CALLBACK_URL?: string;
+  AUTH0_CLIENT_ID?: string;
+  AUTH0_CLIENT_SECRET?: string;
+  AUTH0_ISSUER_BASE_URL?: string;
   DASHBOARD_BASE_URL?: string;
   ENVIRONMENT?: string;
-  WORKOS_CLIENT_ID?: string;
-  WORKOS_REDIRECT_URI?: string;
   SESSION_SECRET?: string;
 };
 

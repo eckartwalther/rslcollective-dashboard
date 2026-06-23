@@ -4,7 +4,6 @@
 import { Miniflare } from "miniflare";
 
 import coreMigration from "../migrations/0001_core.sql?raw";
-import workosSessionMigration from "../migrations/0002_sessions_workos_session_id.sql?raw";
 import {
   createCompanyAndAttachUser,
   createSession,
@@ -59,7 +58,7 @@ async function createD1Harness(): Promise<D1Harness> {
 }
 
 async function applyMigration(db: D1Database) {
-  for (const migration of [coreMigration, workosSessionMigration]) {
+  for (const migration of [coreMigration]) {
     for (const statement of migration
       .split(";")
       .map((part) => part.trim())
@@ -118,7 +117,8 @@ async function insertUser(db: D1Database, id: string, companyId: string | null =
     .prepare(
       `INSERT INTO users (
         id,
-        workos_user_id,
+        auth_provider,
+        auth_subject,
         company_id,
         email,
         first_name,
@@ -127,11 +127,11 @@ async function insertUser(db: D1Database, id: string, companyId: string | null =
         role,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, 'owner', ?, ?)`
+      ) VALUES (?, 'auth0', ?, ?, ?, ?, ?, 1, 'owner', ?, ?)`
     )
     .bind(
       id,
-      `workos_${id}`,
+      `auth0|${id}`,
       companyId,
       `${id}@example.com`,
       "Test",
@@ -185,7 +185,7 @@ describe("database helper utilities", () => {
     expect(addDaysIso(30, base)).toBe("2026-07-11T00:00:00.000Z");
   });
 
-  it("stores session token hash and WorkOS session ID without raw tokens", async () => {
+  it("stores session token hash without raw tokens or provider tokens", async () => {
     const { db, dispose } = await createD1Harness();
 
     try {
@@ -196,7 +196,6 @@ describe("database helper utilities", () => {
         {
           userId: "usr_session",
           tokenHash: "hashed-local-token",
-          workosSessionId: "workos_session_test",
           expiresAt: "2026-07-11T00:00:00.000Z"
         },
         {
@@ -209,13 +208,14 @@ describe("database helper utilities", () => {
         .all<{ name: string }>();
       const columnNames = columns.results.map((column) => column.name);
 
-      expect(columnNames).toContain("workos_session_id");
       expect(session).toMatchObject({
         id: "ses_created",
-        token_hash: "hashed-local-token",
-        workos_session_id: "workos_session_test"
+        token_hash: "hashed-local-token"
       });
       expect(JSON.stringify(session)).not.toContain("raw-local-token");
+      expect(JSON.stringify(session)).not.toContain("id_token");
+      expect(JSON.stringify(session)).not.toContain("access_token");
+      expect(JSON.stringify(session)).not.toContain("refresh_token");
     } finally {
       await dispose();
     }

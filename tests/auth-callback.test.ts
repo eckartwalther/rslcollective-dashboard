@@ -7,13 +7,14 @@ import {
   SESSION_COOKIE_NAME,
   type SessionStore
 } from "../worker/lib/session";
-import type { SessionData, SessionRow, UserRow, WorkosUserData } from "../worker/lib/db";
-import type { WorkosAuthenticatedUser, WorkosAuthEnv } from "../worker/lib/workos";
+import type { AuthenticatedUserData, SessionData, SessionRow, UserRow } from "../worker/lib/db";
+import { Auth0AuthError, type Auth0AuthenticatedUser, type Auth0AuthEnv } from "../worker/lib/auth0";
 
 const env = {
-  WORKOS_CLIENT_ID: "client_test",
-  WORKOS_REDIRECT_URI: "https://dashboard.rslcollective.org/auth/callback",
-  WORKOS_API_KEY: "sk_test",
+  AUTH0_ISSUER_BASE_URL: "https://tenant.example.auth0.com",
+  AUTH0_CLIENT_ID: "client_test",
+  AUTH0_CLIENT_SECRET: "secret_test",
+  AUTH0_CALLBACK_URL: "https://dashboard.rslcollective.org/auth/callback",
   SESSION_SECRET: "test-session-secret",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
   ENVIRONMENT: "production",
@@ -22,15 +23,20 @@ const env = {
 
 const localEnv = {
   ...env,
-  WORKOS_REDIRECT_URI: "https://dashboard.rslcollective.org/auth/callback",
+  AUTH0_CALLBACK_URL: undefined,
   DASHBOARD_BASE_URL: "http://localhost:8787",
   ENVIRONMENT: "development"
+};
+
+type TestEnv = Omit<typeof env, "SESSION_SECRET"> & {
+  SESSION_SECRET?: string;
 };
 
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_local",
-    workos_user_id: "user_workos",
+    auth_provider: "auth0",
+    auth_subject: "auth0|user_test",
     company_id: null,
     email: "publisher@example.com",
     first_name: "Jane",
@@ -49,7 +55,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_local",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -60,13 +65,15 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
 function createHarness(options: {
   existingUser?: UserRow | null;
   rootSession?: SessionRow | null;
-  workosUser?: WorkosAuthenticatedUser;
+  auth0User?: Auth0AuthenticatedUser;
+  exchangeError?: Error;
 } = {}) {
   let user = options.existingUser ?? null;
   const calls = {
     exchangedCode: null as string | null,
-    createdUser: null as WorkosUserData | null,
-    updatedUser: null as WorkosUserData | null,
+    exchangedNonce: null as string | null,
+    createdUser: null as AuthenticatedUserData | null,
+    updatedUser: null as AuthenticatedUserData | null,
     createdSession: null as SessionData | null
   };
   const rootSession = options.rootSession;
@@ -78,7 +85,6 @@ function createHarness(options: {
         user_id: session.userId,
         token_hash: session.tokenHash,
         csrf_token_hash: session.csrfTokenHash ?? null,
-        workos_session_id: session.workosSessionId ?? null,
         expires_at: session.expiresAt
       });
     },
@@ -91,42 +97,50 @@ function createHarness(options: {
 
   const deps: AuthRouteDeps = {
     createSessionStore: () => sessionStore,
-    exchangeAuthorizationCode: async (_env: WorkosAuthEnv, code: string) => {
+    exchangeAuthorizationCode: async (_env: Auth0AuthEnv, code: string, nonce: string) => {
       calls.exchangedCode = code;
+      calls.exchangedNonce = nonce;
+
+      if (options.exchangeError) {
+        throw options.exchangeError;
+      }
+
       return (
-        options.workosUser ?? {
-          id: "user_workos",
+        options.auth0User ?? {
+          authProvider: "auth0",
+          authSubject: "auth0|user_test",
           email: "publisher@example.com",
           firstName: "Jane",
           lastName: "Publisher",
-          emailVerified: true,
-          sessionId: "workos_session_test"
+          emailVerified: true
         }
       );
     },
-    getUserByWorkosUserId: async () => user,
-    createUserFromWorkos: async (_db, workosUser) => {
-      calls.createdUser = workosUser;
+    getUserByAuthIdentity: async () => user,
+    createUserFromAuthIdentity: async (_db, authUser) => {
+      calls.createdUser = authUser;
       user = createUser({
         id: "usr_created",
-        workos_user_id: workosUser.workosUserId,
-        email: workosUser.email,
-        first_name: workosUser.firstName ?? null,
-        last_name: workosUser.lastName ?? null,
-        email_verified: workosUser.emailVerified ? 1 : 0
+        auth_provider: authUser.authProvider,
+        auth_subject: authUser.authSubject,
+        email: authUser.email,
+        first_name: authUser.firstName ?? null,
+        last_name: authUser.lastName ?? null,
+        email_verified: authUser.emailVerified ? 1 : 0
       });
       return user;
     },
-    updateUserFromWorkos: async (_db, workosUser) => {
-      calls.updatedUser = workosUser;
+    updateUserFromAuthIdentity: async (_db, authUser) => {
+      calls.updatedUser = authUser;
       user = createUser({
         ...(user ?? {}),
         id: user?.id ?? "usr_existing",
-        workos_user_id: workosUser.workosUserId,
-        email: workosUser.email,
-        first_name: workosUser.firstName ?? null,
-        last_name: workosUser.lastName ?? null,
-        email_verified: workosUser.emailVerified ? 1 : 0
+        auth_provider: authUser.authProvider,
+        auth_subject: authUser.authSubject,
+        email: authUser.email,
+        first_name: authUser.firstName ?? null,
+        last_name: authUser.lastName ?? null,
+        email_verified: authUser.emailVerified ? 1 : 0
       });
       return user;
     },
@@ -157,7 +171,7 @@ function localCallbackUrl(params: URLSearchParams) {
 async function callbackRequest(
   routes: ReturnType<typeof createAuthRoutes>,
   params: URLSearchParams,
-  requestEnv = env
+  requestEnv: TestEnv = env
 ) {
   return routes.fetch(new Request(callbackUrl(params)), requestEnv);
 }
@@ -193,12 +207,27 @@ async function expectAuthErrorPage(
   }
 }
 
-describe("AuthKit callback", () => {
+describe("Auth0 callback", () => {
   it("rejects missing state", async () => {
     const { routes } = createHarness();
     const response = await callbackRequest(routes, new URLSearchParams({ code: "code_test" }));
 
     await expectAuthErrorPage(response, "Sign-in link expired", ["code_test"]);
+  });
+
+  it("fails closed before state validation when the session secret is missing", async () => {
+    const { routes, calls } = createHarness();
+    const state = await signedState();
+    const response = await callbackRequest(
+      routes,
+      new URLSearchParams({ code: "code_test", state }),
+      { ...env, SESSION_SECRET: undefined }
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(body).toContain("Auth0 authorization is not configured.");
+    expect(calls.exchangedCode).toBeNull();
   });
 
   it("rejects malformed state", async () => {
@@ -254,23 +283,51 @@ describe("AuthKit callback", () => {
   it("rejects missing authorization code", async () => {
     const { routes } = createHarness();
     const state = await signedState();
-    const response = await callbackRequest(
-      routes,
-      new URLSearchParams({ state })
-    );
+    const response = await callbackRequest(routes, new URLSearchParams({ state }));
 
     await expectAuthErrorPage(response, "Authentication could not be completed", [state]);
   });
 
-  it("exchanges a valid code through the WorkOS helper", async () => {
+  it("exchanges a valid code through the Auth0 helper with state nonce", async () => {
     const { routes, calls } = createHarness();
+    const state = await signedState();
     const response = await callbackRequest(
       routes,
-      new URLSearchParams({ code: "code_valid", state: await signedState() })
+      new URLSearchParams({ code: "code_valid", state })
     );
 
     expect(response.status).toBe(302);
     expect(calls.exchangedCode).toBe("code_valid");
+    expect(calls.exchangedNonce).toEqual(expect.any(String));
+  });
+
+  it("asks unverified Auth0 users to verify email before creating local records", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { routes, calls } = createHarness({
+      exchangeError: new Auth0AuthError(
+        "email_unverified",
+        "Auth0 ID token email is not verified."
+      )
+    });
+    const response = await callbackRequest(
+      routes,
+      new URLSearchParams({ code: "code_valid", state: await signedState() }),
+      { ...env, ENVIRONMENT: "development" }
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(400);
+    expect(body).toContain("Email verification required");
+    expect(body).toContain("Please verify your email address, then sign in again.");
+    expect(calls.createdUser).toBeNull();
+    expect(calls.updatedUser).toBeNull();
+    expect(calls.createdSession).toBeNull();
+    expect(consoleWarn).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: "auth0_callback_failed",
+        category: "email_unverified"
+      })
+    );
   });
 
   it("creates a new local user when none exists", async () => {
@@ -281,7 +338,8 @@ describe("AuthKit callback", () => {
     );
 
     expect(calls.createdUser).toEqual({
-      workosUserId: "user_workos",
+      authProvider: "auth0",
+      authSubject: "auth0|user_test",
       email: "publisher@example.com",
       firstName: "Jane",
       lastName: "Publisher",
@@ -293,13 +351,13 @@ describe("AuthKit callback", () => {
   it("updates an existing local user", async () => {
     const { routes, calls } = createHarness({
       existingUser: createUser({ id: "usr_existing" }),
-      workosUser: {
-        id: "user_workos",
+      auth0User: {
+        authProvider: "auth0",
+        authSubject: "auth0|user_test",
         email: "updated@example.com",
         firstName: "Updated",
         lastName: "Publisher",
-        emailVerified: false,
-        sessionId: "workos_session_updated"
+        emailVerified: true
       }
     });
     await callbackRequest(
@@ -309,15 +367,16 @@ describe("AuthKit callback", () => {
 
     expect(calls.createdUser).toBeNull();
     expect(calls.updatedUser).toEqual({
-      workosUserId: "user_workos",
+      authProvider: "auth0",
+      authSubject: "auth0|user_test",
       email: "updated@example.com",
       firstName: "Updated",
       lastName: "Publisher",
-      emailVerified: false
+      emailVerified: true
     });
   });
 
-  it("creates a local D1-backed session without storing the raw token", async () => {
+  it("creates a local D1-backed session without storing raw provider tokens", async () => {
     const { routes, calls } = createHarness();
     await callbackRequest(
       routes,
@@ -326,11 +385,13 @@ describe("AuthKit callback", () => {
 
     expect(calls.createdSession).toMatchObject({
       userId: "usr_created",
-      workosSessionId: "workos_session_test",
       expiresAt: expect.any(String)
     });
     expect(calls.createdSession?.tokenHash).toEqual(expect.any(String));
     expect(calls.createdSession).not.toHaveProperty("token");
+    expect(calls.createdSession).not.toHaveProperty("idToken");
+    expect(calls.createdSession).not.toHaveProperty("accessToken");
+    expect(calls.createdSession).not.toHaveProperty("refreshToken");
   });
 
   it("sets the __Host-rsl_dashboard_session cookie and redirects to /dashboard", async () => {
@@ -385,7 +446,6 @@ describe("AuthKit callback", () => {
     expect(response.status).toBe(302);
     expect(calls.createdSession).toMatchObject({
       userId: "usr_created",
-      workosSessionId: "workos_session_test",
       expiresAt: expect.any(String)
     });
     expect(calls.createdSession).not.toHaveProperty("token");
@@ -428,9 +488,7 @@ describe("AuthKit callback", () => {
   it("redirects root to /dashboard when authenticated", async () => {
     const token = "root-token";
     const tokenHash = await hashSessionToken(token);
-    const { routes } = createHarness({
-      rootSession: createSessionRow({ token_hash: tokenHash })
-    });
+    const { routes } = createHarness({ rootSession: createSessionRow({ token_hash: tokenHash }) });
     const response = await routes.fetch(
       new Request("https://dashboard.rslcollective.org/", {
         headers: { Cookie: `${SESSION_COOKIE_NAME}=${token}` }
@@ -440,5 +498,6 @@ describe("AuthKit callback", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/dashboard");
+    expect(response.headers.get("Set-Cookie")).toContain(SESSION_COOKIE_NAME);
   });
 });

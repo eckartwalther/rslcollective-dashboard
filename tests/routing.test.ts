@@ -1,9 +1,10 @@
 import app from "../worker/index";
 
 const env = {
-  WORKOS_CLIENT_ID: "client_test",
-  WORKOS_REDIRECT_URI: "https://dashboard.rslcollective.org/auth/callback",
-  WORKOS_API_KEY: "sk_test",
+  AUTH0_ISSUER_BASE_URL: "https://tenant.example.auth0.com",
+  AUTH0_CLIENT_ID: "client_test",
+  AUTH0_CLIENT_SECRET: "secret_test",
+  AUTH0_CALLBACK_URL: "https://dashboard.rslcollective.org/auth/callback",
   SESSION_SECRET: "test-session-secret",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
   ENVIRONMENT: "production",
@@ -15,7 +16,7 @@ const env = {
 
 const localEnv = {
   ...env,
-  WORKOS_REDIRECT_URI: "http://localhost:8787/auth/callback",
+  AUTH0_CALLBACK_URL: undefined,
   DASHBOARD_BASE_URL: "http://localhost:8787",
   ENVIRONMENT: "development"
 };
@@ -44,7 +45,7 @@ describe("Worker routing", () => {
     const location = response.headers.get("Location");
 
     expect(response.status).toBe(302);
-    expect(location).toContain("https://api.workos.com/user_management/authorize");
+    expect(location).toContain("https://tenant.example.auth0.com/authorize");
     expect(location).toContain("redirect_uri=http%3A%2F%2Flocalhost%3A8787%2Fauth%2Fcallback");
   });
 
@@ -69,7 +70,7 @@ describe("Worker routing", () => {
     const location = response.headers.get("Location");
 
     expect(response.status).toBe(302);
-    expect(location).toContain("screen_hint=sign-up");
+    expect(location).toContain("screen_hint=signup");
   });
 
   it("keeps /logout Origin validation unchanged behind a valid local host", async () => {

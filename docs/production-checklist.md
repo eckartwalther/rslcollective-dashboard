@@ -1,6 +1,6 @@
 # Production Setup Checklist
 
-Use this checklist when moving the RSL Collective Profile Application from local QA to production. Do not commit real account IDs, database IDs, API tokens, or secrets.
+Use this checklist when moving the RSL Collective Profile Application from local QA to production. Do not commit real API tokens or secrets.
 
 ## 1. Cloudflare Account And D1 Setup
 
@@ -14,7 +14,7 @@ Use this checklist when moving the RSL Collective Profile Application from local
   - Workers Assets binding name `ASSETS`.
   - `not_found_handling: "single-page-application"`.
   - `run_worker_first` entries for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
-  - Production vars for `WORKOS_REDIRECT_URI`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT`.
+  - Production vars for `AUTH0_ISSUER_BASE_URL`, `AUTH0_CLIENT_ID`, `AUTH0_CALLBACK_URL`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT`.
   - Custom-domain route for `dashboard.rslcollective.org`.
 - Create the production D1 database if it does not already exist:
 
@@ -23,23 +23,27 @@ pnpm exec wrangler d1 create rsl-collective-dashboard --config wrangler.producti
 ```
 
 - Copy the returned production `database_id` into `wrangler.production.jsonc`.
-- Do not add a migration for the required Publisher Profile address fields. The API enforces `addressLine1`, `city`, `postalCode`, and `country` through server validation while the pre-production D1 columns remain nullable.
 
-## 2. WorkOS Production AuthKit Setup
+## 2. Auth0 Production Setup
 
-- Use the WorkOS Production environment, not Staging.
-- Use WorkOS default hosted AuthKit for the first production deploy.
-- Use the default WorkOS email sender for the first production deploy.
-- Use the WorkOS Production Client ID and API Key.
-- Configure AuthKit for the production dashboard:
-  - Callback URL: `https://dashboard.rslcollective.org/auth/callback`
-  - Sign-in endpoint: `https://dashboard.rslcollective.org/login`
-  - Logout/sign-out return URL: `https://dashboard.rslcollective.org/login`
+- Use an Auth0 Production tenant, preferably separate from development and staging tenants.
+- Create an Auth0 Regular Web Application for the dashboard.
+- Configure the production application:
+  - Allowed Callback URLs: `https://dashboard.rslcollective.org/auth/callback`
+  - Allowed Logout URLs: `https://dashboard.rslcollective.org/login`
+  - Application Login URI: `https://dashboard.rslcollective.org/login`
   - App homepage: `https://dashboard.rslcollective.org/`
-- Do not configure a custom AuthKit domain for the first production deploy.
-- Do not configure a custom WorkOS email sender/domain for the first production deploy.
-- Custom AuthKit domain `login.rslcollective.org` and custom email sender/domain `no-reply@mail.rslcollective.org` are optional future branding steps.
-- Do not enable WorkOS Organizations for this phase.
+  - Grant type: Authorization Code
+  - ID token signing algorithm: RS256
+- Configure Universal Login branding and test it in staging before production.
+- Configure custom domain `login.rslcollective.org`:
+  - Use Auth0-managed certificates.
+  - Add the Auth0-provided Cloudflare CNAME as DNS-only, not proxied, at least through validation.
+  - Keep the CNAME present for certificate renewal.
+- Do not configure the React app with Auth0 SPA SDK values.
+- Do not expose Auth0 access tokens, ID tokens, refresh tokens, or client secrets to browser code.
+
+Allowed Web Origins are secondary for the current server-side architecture. Add `https://dashboard.rslcollective.org` only if a future browser-side Auth0 SDK flow is introduced.
 
 ## 3. Worker Secrets And Runtime Variables
 
@@ -47,42 +51,32 @@ Required Worker bindings are `ASSETS` and `DB`.
 
 Required Worker runtime values:
 
-- `WORKOS_CLIENT_ID`
-- `WORKOS_API_KEY`
-- `WORKOS_REDIRECT_URI`
+- `AUTH0_ISSUER_BASE_URL`
+- `AUTH0_CLIENT_ID`
+- `AUTH0_CALLBACK_URL`
+- `AUTH0_CLIENT_SECRET`
 - `DASHBOARD_BASE_URL`
 - `SESSION_SECRET`
 - `ENVIRONMENT`
 
 Secrets:
 
-- `WORKOS_API_KEY`
+- `AUTH0_CLIENT_SECRET`
 - `SESSION_SECRET`
-- `WORKOS_CLIENT_ID` may be stored as a secret, but prefer a non-secret Worker variable unless there is a reason to hide it.
 
 Non-secret runtime variables:
 
-- `WORKOS_CLIENT_ID=<WorkOS Production Client ID>`, preferred unless managed as a secret
-- `WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback`
+- `AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org`
+- `AUTH0_CLIENT_ID=<Auth0 Production Regular Web Application Client ID>`
+- `AUTH0_CALLBACK_URL=https://dashboard.rslcollective.org/auth/callback`
 - `DASHBOARD_BASE_URL=https://dashboard.rslcollective.org`
 - `ENVIRONMENT=production`
 
-`WORKOS_LOGOUT_URI` is not used by this app. Logout uses the stored WorkOS session ID and sends WorkOS `returnTo` to `${DASHBOARD_BASE_URL}/login`.
-
-Set production secrets and variables before deploy:
+Set production secrets before deploy:
 
 ```sh
-pnpm exec wrangler secret put WORKOS_API_KEY --config wrangler.production.jsonc
+pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --config wrangler.production.jsonc
 pnpm exec wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
-```
-
-`WORKOS_REDIRECT_URI`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT` are already set in `wrangler.production.jsonc`. Set `WORKOS_CLIENT_ID` as a production Worker variable in Cloudflare Worker settings, or as a secret if the team chooses to hide it:
-
-```txt
-WORKOS_CLIENT_ID=<WorkOS Production Client ID>
-WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback
-DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
-ENVIRONMENT=production
 ```
 
 Cloudflare deployment credentials such as `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are Wrangler or CI credentials, not application runtime variables. Never commit them and never expose them with a `VITE_` prefix.
@@ -103,7 +97,7 @@ Confirm Wrangler is targeting the correct Cloudflare account:
 pnpm exec wrangler whoami
 ```
 
-Apply the two production D1 migrations only after the production database ID and account ID are correct:
+Apply production D1 migrations only after the production database ID and account ID are correct:
 
 ```sh
 pnpm db:migrate:remote
@@ -115,7 +109,7 @@ Deploy only after migrations and runtime configuration are complete:
 pnpm worker:deploy
 ```
 
-Do not run `pnpm db:migrate:remote` or `pnpm worker:deploy` until the Cloudflare account ID, production D1 database ID, WorkOS Production configuration, and Worker runtime values have all been verified.
+Do not run `pnpm db:migrate:remote` or `pnpm worker:deploy` until the Cloudflare account ID, production D1 database ID, Auth0 Production configuration, and Worker runtime values have all been verified.
 
 ## 5. Production Smoke Test
 
@@ -123,16 +117,17 @@ After deploy:
 
 1. Visit `https://dashboard.rslcollective.org/`.
 2. Confirm unauthenticated access redirects to `/login`.
-3. Complete login through WorkOS Production AuthKit.
-4. Confirm the callback reaches `/auth/callback`.
-5. Confirm the authenticated user lands on `/dashboard`.
-6. Open Publisher Profile.
-7. Create or edit the Publisher Profile, including required `Country`, `Business address line 1`, `City`, and `Postal code`.
-8. Refresh and confirm the profile persists.
-9. Sign out.
-10. Confirm logout redirects through WorkOS hosted logout and returns to `/login`.
-11. Visit `/dashboard` after logout and confirm login is required.
-12. Log in again and confirm the existing Publisher Profile loads.
+3. Confirm `/login` redirects to Auth0 Universal Login on `https://login.rslcollective.org`.
+4. Complete login through Auth0.
+5. Confirm the callback reaches `/auth/callback`.
+6. Confirm the authenticated user lands on `/dashboard`.
+7. Open Publisher Profile.
+8. Create or edit the Publisher Profile, including required `Country`, `Business address line 1`, `City`, and `Postal code`.
+9. Refresh and confirm the profile persists.
+10. Sign out.
+11. Confirm logout clears the local session, redirects through Auth0 logout, and returns to `/login`.
+12. Visit `/dashboard` after logout and confirm login is required.
+13. Log in again and confirm the existing Publisher Profile loads.
 
 Useful non-mutating smoke commands:
 
@@ -148,7 +143,6 @@ curl -i https://dashboard.rslcollective.org/api/session
 - If the Worker deploy succeeds but smoke testing fails, redeploy the last known good Worker version from Cloudflare or from the previous git revision.
 - If D1 migrations have already run, do not manually edit production D1 data during rollback unless a separate data recovery plan is prepared.
 - `0001_core.sql` creates users, companies, and sessions.
-- `0002_sessions_workos_session_id.sql` adds `sessions.workos_session_id` for WorkOS logout.
 - Production sessions use `__Host-rsl_dashboard_session` with `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, and no `Domain`.
 - Local HTTP development sessions use `rsl_dashboard_session` without `Secure`.
 
@@ -156,9 +150,9 @@ curl -i https://dashboard.rslcollective.org/api/session
 
 - No production deploy in this checklist step.
 - No remote migration until explicitly executed after setup verification.
-- No WorkOS Organizations.
 - No `company_members` or multi-company behavior.
 - No onboarding, enrollment, RSL parsing, repertoire backend, reporting backend, payment backend, or licensee-exclusion backend.
 - No `publisher_url`, website, or domain fields.
 - No localStorage or sessionStorage auth.
+- No Auth0 SPA SDK.
 - No Tailwind or Vinxi.

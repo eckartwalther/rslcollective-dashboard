@@ -27,7 +27,8 @@ const productionEnv = {
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_test",
-    workos_user_id: "workos_test",
+    auth_provider: "auth0",
+    auth_subject: "auth0|user_test",
     company_id: null,
     email: "publisher@example.com",
     first_name: "Jane",
@@ -46,7 +47,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",

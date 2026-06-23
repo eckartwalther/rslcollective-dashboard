@@ -7,7 +7,7 @@ Authenticated profile dashboard for RSL Collective publishers. The app is a Vite
 - React 19, React Router DOM v7, TanStack React Query v5, Mantine v8
 - Vite, TypeScript, Vitest, Testing Library, jsdom
 - Cloudflare Workers, Workers Assets, Wrangler, Hono, D1
-- WorkOS/AuthKit for hosted authentication
+- Auth0 Universal Login with a Regular Web Application OIDC client
 
 ## Commands
 
@@ -38,6 +38,6 @@ Production deploy uses `wrangler.production.jsonc`, which contains the `dashboar
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for Cloudflare account targeting, D1 setup, Worker secrets, WorkOS/AuthKit configuration, and the production smoke test.
+See [docs/deployment.md](docs/deployment.md) for Cloudflare account targeting, D1 setup, Worker secrets, Auth0 configuration, and the production smoke test.
 
 Use [docs/production-checklist.md](docs/production-checklist.md) for the final production setup sequence before running remote migrations or deploying.

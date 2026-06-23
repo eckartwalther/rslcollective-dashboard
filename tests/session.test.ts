@@ -18,7 +18,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -40,7 +39,6 @@ function createStore(session: SessionRow | null = null) {
         user_id: data.userId,
         token_hash: data.tokenHash,
         csrf_token_hash: data.csrfTokenHash ?? null,
-        workos_session_id: data.workosSessionId ?? null,
         expires_at: data.expiresAt
       });
       return session;
@@ -76,14 +74,12 @@ describe("session utilities", () => {
       store,
       "usr_test",
       { ENVIRONMENT: "development" },
-      "workos_session_test",
       new Date("2026-06-11T00:00:00.000Z")
     );
 
     expect(captured.created).toEqual({
       userId: "usr_test",
       tokenHash: result.tokenHash,
-      workosSessionId: "workos_session_test",
       expiresAt: "2026-07-11T00:00:00.000Z"
     });
     expect(captured.created).not.toHaveProperty("token");

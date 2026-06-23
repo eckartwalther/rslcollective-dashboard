@@ -23,7 +23,6 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     user_id: "usr_test",
     token_hash: "hash_test",
     csrf_token_hash: null,
-    workos_session_id: null,
     expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
@@ -34,7 +33,8 @@ function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_test",
-    workos_user_id: "workos_test",
+    auth_provider: "auth0",
+    auth_subject: "auth0|user_test",
     company_id: "cmp_test",
     email: "jane@example.com",
     first_name: "Jane",
@@ -165,7 +165,7 @@ describe("GET /api/session", () => {
     expect(await readJson(response)).toEqual({ authenticated: false });
   });
 
-  it("does not expose WorkOS IDs, session IDs, or token hashes", async () => {
+  it("does not expose provider IDs, session IDs, or token hashes", async () => {
     const token = "safe-response-token";
     const tokenHash = await hashSessionToken(token);
     const route = createHarness({
@@ -179,7 +179,9 @@ describe("GET /api/session", () => {
     );
     const body = JSON.stringify(await readJson(response));
 
-    expect(body).not.toContain("workos");
+    expect(body).not.toContain("auth0|");
+    expect(body).not.toContain("auth_subject");
+    expect(body).not.toContain("auth_provider");
     expect(body).not.toContain("ses_test");
     expect(body).not.toContain(tokenHash);
     expect(body).not.toContain("token_hash");

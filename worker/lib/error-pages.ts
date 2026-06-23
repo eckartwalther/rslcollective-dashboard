@@ -51,6 +51,17 @@ export function authenticationCouldNotCompletePage(c: Context, status: Contentfu
   });
 }
 
+export function emailVerificationRequiredPage(c: Context) {
+  return authErrorPage(c, {
+    title: "Email verification required",
+    message: "Please verify your email address, then sign in again.",
+    primaryAction: {
+      label: "Sign in again",
+      href: "/login"
+    }
+  });
+}
+
 function renderAuthErrorPage(options: AuthErrorPageOptions) {
   const secondaryAction = options.secondaryAction
     ? `<a class="secondary-action" href="${escapeHtml(options.secondaryAction.href)}">${escapeHtml(options.secondaryAction.label)}</a>`

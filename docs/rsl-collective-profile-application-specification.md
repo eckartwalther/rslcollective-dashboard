@@ -15,7 +15,7 @@ The public RSL Collective website links users into the dashboard application thr
 <a href="https://dashboard.rslcollective.org/login">Login</a>
 ```
 
-The public website does not implement authentication logic, does not construct WorkOS/AuthKit URLs, and does not include WorkOS parameters in static links.
+The public website does not implement authentication logic, does not construct Auth0 Universal Login URLs, and does not include Auth0 parameters in static links.
 
 The dashboard application complements the RSL Collective public website and should share minimal styling, including the RSL Collective name/logo and a simple brand-aligned Mantine palette.
 
@@ -25,9 +25,9 @@ Use agentic coding practices that keep Codex focused on this specification. The 
 
 Phase one includes only:
 
-1. WorkOS AuthKit registration/login.
-2. Dashboard `/register` route that starts the AuthKit sign-up flow.
-3. Dashboard `/login` route that starts the AuthKit sign-in flow.
+1. Auth0 Universal Login registration/login.
+2. Dashboard `/register` route that starts the Universal Login sign-up flow.
+3. Dashboard `/login` route that starts the Universal Login sign-in flow.
 4. Auth callback handling.
 5. Local session creation.
 6. Root redirect behavior.
@@ -46,7 +46,7 @@ Do not implement:
 * custom email verification
 * custom password reset
 * multi-company membership
-* WorkOS Organizations
+* Auth0 Organizations
 * full onboarding workflow
 * public marketing site
 * Markdown content system
@@ -75,9 +75,9 @@ The dashboard application receives the user at:
 https://dashboard.rslcollective.org/register
 ```
 
-That route generates a WorkOS/AuthKit authorization URL server-side and redirects the browser to the hosted AuthKit UI, requesting the sign-up screen where supported.
+That route generates a Auth0 Universal Login authorization URL server-side and redirects the browser to the hosted Universal Login UI, requesting the sign-up screen where supported.
 
-After authentication, WorkOS redirects the user back to:
+After authentication, Auth0 redirects the user back to:
 
 ```txt
 https://dashboard.rslcollective.org/auth/callback
@@ -111,9 +111,9 @@ The dashboard application receives the user at:
 https://dashboard.rslcollective.org/login
 ```
 
-That route generates a WorkOS/AuthKit authorization URL server-side and redirects the browser to the hosted AuthKit UI, requesting the sign-in screen where supported.
+That route generates a Auth0 Universal Login authorization URL server-side and redirects the browser to the hosted Universal Login UI, requesting the sign-in screen where supported.
 
-After authentication, WorkOS redirects the user back to:
+After authentication, Auth0 redirects the user back to:
 
 ```txt
 https://dashboard.rslcollective.org/auth/callback
@@ -235,7 +235,7 @@ worker/
   lib/
     db.ts
     session.ts
-    workos.ts
+    auth0.ts
     csrf.ts
     responses.ts
     assets.ts
@@ -338,17 +338,17 @@ Recommended Wrangler assets configuration:
 
 `/dashboard` and nested dashboard routes should be served by the SPA fallback.
 
-Auth routes, API routes, logout, and root must invoke the Worker first. The WorkOS callback route must not be swallowed by the SPA fallback.
+Auth routes, API routes, logout, and root must invoke the Worker first. The Auth0 callback route must not be swallowed by the SPA fallback.
 
-## 8. WorkOS/AuthKit
+## 8. Auth0 Universal Login
 
-Use WorkOS AuthKit hosted authentication.
+Use Auth0 Universal Login hosted authentication.
 
 Production configuration:
 
 ```txt
-AuthKit domain: WorkOS default hosted AuthKit for initial production deploy
-Email sender: WorkOS default email sender for initial production deploy
+Universal Login domain: login.rslcollective.org
+Email sender: Auth0 default email sender for initial production deploy
 Dashboard/app domain: dashboard.rslcollective.org
 Callback URL: https://dashboard.rslcollective.org/auth/callback
 Sign-in endpoint: https://dashboard.rslcollective.org/login
@@ -368,33 +368,33 @@ Local auth testing should use Wrangler and the Worker dev server at:
 http://localhost:8787
 ```
 
-Vite-only dev may be used for UI-only work, but WorkOS callback testing requires the Worker.
+Vite-only dev may be used for UI-only work, but Auth0 callback testing requires the Worker.
 
 Auth rules:
 
-* WorkOS handles registration/login.
-* WorkOS handles password reset.
-* WorkOS handles email verification.
+* Auth0 handles registration/login.
+* Auth0 handles password reset.
+* Auth0 handles email verification.
 * Do not store passwords.
 * Do not implement custom email delivery.
-* Do not expose WorkOS secrets to the browser.
-* The application may use WorkOS/AuthKit parameters such as screen hints, if supported, to land users on the registration screen from `/register` and the login screen from `/login`.
+* Do not expose Auth0 secrets to the browser.
+* The application may use Auth0 Universal Login parameters such as screen hints, if supported, to land users on the registration screen from `/register` and the login screen from `/login`.
 
-### 8.1 WorkOS custom domain and email domain
+### 8.1 Auth0 custom domain and email domain
 
-The first production deploy uses WorkOS default hosted AuthKit and the default WorkOS email sender.
+Production uses `login.rslcollective.org` as the Auth0 Universal Login custom domain.
 
-`login.rslcollective.org` may be configured later as an optional WorkOS AuthKit custom domain for branding.
+Use Auth0-managed certificates for `login.rslcollective.org`. When DNS is managed in Cloudflare, configure the Auth0 CNAME record as DNS-only, not proxied, at least through validation.
 
-The email sender `no-reply@mail.rslcollective.org` may be configured later as an optional custom WorkOS email sender/domain for branding.
+The email sender `no-reply@mail.rslcollective.org` may be configured later as an optional custom Auth0 email sender/domain for branding.
 
-If those optional custom domains are added later and DNS is managed in Cloudflare, their WorkOS CNAME records must be DNS-only, not proxied.
+If a custom email sender/domain is added later and DNS is managed in Cloudflare, its Auth0 DNS records must also follow Auth0's DNS requirements.
 
 ### 8.2 Worker runtime and SDK compatibility
 
-Use the current `@workos-inc/node` package version with Worker/edge runtime support.
+Use the current `jose` package version with Worker/edge runtime support.
 
-If the selected WorkOS SDK version requires Node compatibility, enable `nodejs_compat` in Wrangler and verify all of the following before implementing application logic:
+Do not use the Auth0 SPA SDK or expose Auth0 tokens to browser code. If a future server-side dependency requires Node compatibility, enable `nodejs_compat` in Wrangler and verify all of the following before implementing application logic:
 
 ```txt
 pnpm check
@@ -403,33 +403,31 @@ pnpm test
 wrangler dev
 ```
 
-Do not use stale Express-only or Node-server-only AuthKit examples.
+Do not use stale Express-only or Node-server-only Universal Login examples.
 
 ### 8.3 `GET /register`
 
-Starts the WorkOS/AuthKit hosted authentication flow for a new user.
+Starts the Auth0 Universal Login hosted authentication flow for a new user.
 
 Implementation:
 
-* Generate a WorkOS authorization URL server-side.
-* Use `provider: "authkit"`.
-* Use `screen_hint: "sign-up"` where supported.
+* Generate an Auth0 authorization URL server-side.
+* Use `screen_hint=signup`.
 * Include the configured callback URL.
 * Include a signed or otherwise validated `state` value.
-* Redirect the browser to the generated WorkOS/AuthKit URL.
+* Redirect the browser to the generated Auth0 Universal Login URL.
 
 ### 8.4 `GET /login`
 
-Starts the WorkOS/AuthKit hosted authentication flow for a returning user.
+Starts the Auth0 Universal Login hosted authentication flow for a returning user.
 
 Implementation:
 
-* Generate a WorkOS authorization URL server-side.
-* Use `provider: "authkit"`.
-* Use `screen_hint: "sign-in"` where supported.
+* Generate an Auth0 authorization URL server-side.
+* Do not expose Auth0 tokens to browser code.
 * Include the configured callback URL.
 * Include a signed or otherwise validated `state` value.
-* Redirect the browser to the generated WorkOS/AuthKit URL.
+* Redirect the browser to the generated Auth0 Universal Login URL.
 
 ### 8.5 Auth state
 
@@ -451,7 +449,7 @@ Do not accept arbitrary `returnTo` URLs. If `returnTo` is implemented, it must b
 
 ### 8.6 `GET /auth/callback`
 
-Handles the WorkOS/AuthKit callback.
+Handles the Auth0 Universal Login callback.
 
 Implementation:
 
@@ -471,24 +469,24 @@ Implementation:
 * Require a valid same-origin `Origin` header in production.
 * Invalidate the D1 session.
 * Clear the HTTP-only session cookie.
-* Obtain the WorkOS logout URL where available.
-* Redirect through WorkOS logout.
-* If WorkOS logout is not available in local development, fall back to redirecting to `/login`.
+* Obtain the Auth0 logout URL where available.
+* Redirect through Auth0 logout.
+* If Auth0 logout is not available in local development, fall back to redirecting to `/login`.
 
 `GET /logout` should not be implemented in phase one.
 
-## 9. WorkOS Organizations
+## 9. Auth0 Organizations
 
-Phase one does not use WorkOS Organizations.
+Phase one does not use Auth0 Organizations.
 
-WorkOS is used only for user authentication. The RSL Collective D1 database is the source of truth for:
+Auth0 is used only for user authentication. The RSL Collective D1 database is the source of truth for:
 
 * company profiles
 * `users.company_id`
 * user role
 * session state
 
-WorkOS Organizations may be evaluated later for invitations, enterprise SSO, team membership, or more advanced B2B account administration.
+Auth0 Organizations may be evaluated later for invitations, enterprise SSO, team membership, or more advanced B2B account administration.
 
 ## 10. Session Model
 
@@ -609,7 +607,8 @@ CREATE TABLE companies (
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
-  workos_user_id TEXT NOT NULL UNIQUE,
+  auth_provider TEXT NOT NULL,
+  auth_subject TEXT NOT NULL,
   company_id TEXT,
   email TEXT NOT NULL,
   first_name TEXT,
@@ -621,6 +620,7 @@ CREATE TABLE users (
   FOREIGN KEY (company_id) REFERENCES companies(id)
 );
 
+CREATE UNIQUE INDEX idx_users_auth_identity ON users(auth_provider, auth_subject);
 CREATE INDEX idx_users_company_id ON users(company_id);
 
 CREATE TABLE sessions (
@@ -1000,7 +1000,7 @@ Display:
 * whether a company profile exists
 * sign-out button
 
-Do not show WorkOS IDs in normal UI unless placed behind a diagnostics/debug-only section.
+Do not show Auth0 IDs in normal UI unless placed behind a diagnostics/debug-only section.
 
 ### 18.2 Company Profile tab
 
@@ -1159,9 +1159,10 @@ Only include `nodejs_compat` if required by the selected dependencies. If not re
 Required local/production values:
 
 ```txt
-WORKOS_CLIENT_ID
-WORKOS_API_KEY
-WORKOS_REDIRECT_URI
+AUTH0_ISSUER_BASE_URL
+AUTH0_CLIENT_ID
+AUTH0_CLIENT_SECRET
+AUTH0_CALLBACK_URL
 SESSION_SECRET
 DASHBOARD_BASE_URL
 ENVIRONMENT
@@ -1180,7 +1181,9 @@ Only browser-safe values may use `VITE_` prefixes.
 Production examples:
 
 ```txt
-WORKOS_REDIRECT_URI=https://dashboard.rslcollective.org/auth/callback
+AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org
+AUTH0_CLIENT_ID=<Auth0 Production Regular Web Application Client ID>
+AUTH0_CALLBACK_URL=https://dashboard.rslcollective.org/auth/callback
 DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
 ENVIRONMENT=production
 ```
@@ -1188,7 +1191,9 @@ ENVIRONMENT=production
 Local examples:
 
 ```txt
-WORKOS_REDIRECT_URI=http://localhost:8787/auth/callback
+AUTH0_ISSUER_BASE_URL=https://<tenant>.auth0.com
+AUTH0_CLIENT_ID=<Auth0 Development Regular Web Application Client ID>
+AUTH0_CALLBACK_URL=http://localhost:8787/auth/callback
 DASHBOARD_BASE_URL=http://localhost:8787
 ```
 
@@ -1224,8 +1229,8 @@ Targeted tests:
 * later `PUT /api/company` updates company
 * `/` redirects to `/login` when unauthenticated
 * `/` redirects to `/dashboard` when authenticated
-* `/register` redirects to AuthKit sign-up flow
-* `/login` redirects to AuthKit sign-in flow
+* `/register` redirects to Universal Login sign-up flow
+* `/login` redirects to Universal Login sign-in flow
 * `/auth/callback` rejects invalid state
 * `/auth/callback` rejects expired state
 * `/auth/callback` creates or updates local user
@@ -1242,8 +1247,8 @@ Manual tests:
 1. Visit `https://rslcollective.org`.
 2. Click **Join for free**.
 3. Confirm the browser goes to `https://dashboard.rslcollective.org/register`.
-4. Confirm `/register` starts the AuthKit sign-up flow.
-5. Complete AuthKit.
+4. Confirm `/register` starts the Universal Login sign-up flow.
+5. Complete Universal Login.
 6. Land on `/dashboard`.
 7. Confirm the Company Profile tab opens for a new user with no company.
 8. Create company profile.
@@ -1253,14 +1258,14 @@ Manual tests:
 12. Visit `https://rslcollective.org`.
 13. Click **Login**.
 14. Confirm the browser goes to `https://dashboard.rslcollective.org/login`.
-15. Confirm `/login` starts the AuthKit sign-in flow.
+15. Confirm `/login` starts the Universal Login sign-in flow.
 16. Confirm the same profile loads after login.
 17. Confirm user cannot create a second company.
 18. Confirm unauthenticated `/api/company` fails.
 19. Confirm direct visit to `https://dashboard.rslcollective.org/` redirects to `/dashboard` when authenticated.
 20. Confirm direct visit to `https://dashboard.rslcollective.org/` redirects to `/login` when unauthenticated.
 21. Confirm direct visit to `/dashboard` loads the SPA.
-22. Confirm WorkOS callback route is handled by the Worker, not by SPA fallback.
+22. Confirm Auth0 callback route is handled by the Worker, not by SPA fallback.
 
 ## 23. Implementation Sequence
 
@@ -1275,9 +1280,9 @@ Manual tests:
 9. Add D1 schema and DB helpers.
 10. Add session helper functions.
 11. Add Origin validation for mutating requests.
-12. Add WorkOS/AuthKit authorization URL generation.
-13. Add signed or server-validated AuthKit state.
-14. Add WorkOS/AuthKit callback handling.
+12. Add Auth0 Universal Login authorization URL generation.
+13. Add signed or server-validated Universal Login state.
+14. Add Auth0 Universal Login callback handling.
 15. Add local user create/update logic.
 16. Add local session creation and cookie handling.
 17. Add sign-out behavior.
@@ -1292,7 +1297,7 @@ Manual tests:
 26. Add tests.
 27. Add Cloudflare/Wrangler production setup notes.
 28. Run `pnpm check`, `pnpm build`, and `pnpm test`.
-29. Run `wrangler dev` and complete local AuthKit callback testing.
+29. Run `wrangler dev` and complete local Universal Login callback testing.
 30. Deploy to Cloudflare Workers.
 
 ## 24. Codex Guardrails
@@ -1322,9 +1327,9 @@ Codex should prefer:
 Codex should avoid:
 
 * inventing onboarding flows
-* adding WorkOS Organizations
+* adding Auth0 Organizations
 * adding company membership tables
 * adding Vinxi
-* exposing WorkOS secrets to the browser
+* exposing Auth0 secrets to the browser
 * relying on client-supplied company identifiers
 * bypassing Worker-first routing for auth/API routes

@@ -3,7 +3,8 @@ import { nowIso } from "./time";
 
 export type UserRow = {
   id: string;
-  workos_user_id: string;
+  auth_provider: string;
+  auth_subject: string;
   company_id: string | null;
   email: string;
   first_name: string | null;
@@ -39,14 +40,14 @@ export type SessionRow = {
   user_id: string;
   token_hash: string;
   csrf_token_hash: string | null;
-  workos_session_id: string | null;
   expires_at: string;
   created_at: string;
   updated_at: string;
 };
 
-export type WorkosUserData = {
-  workosUserId: string;
+export type AuthenticatedUserData = {
+  authProvider: string;
+  authSubject: string;
   email: string;
   firstName?: string | null;
   lastName?: string | null;
@@ -73,7 +74,6 @@ export type SessionData = {
   userId: string;
   tokenHash: string;
   csrfTokenHash?: string | null;
-  workosSessionId?: string | null;
   expiresAt: string;
 };
 
@@ -90,16 +90,20 @@ function emailVerifiedValue(value: boolean | undefined) {
   return value ? 1 : 0;
 }
 
-export function getUserByWorkosUserId(db: D1Database, workosUserId: string) {
+export function getUserByAuthIdentity(
+  db: D1Database,
+  authProvider: string,
+  authSubject: string
+) {
   return db
-    .prepare("SELECT * FROM users WHERE workos_user_id = ?")
-    .bind(workosUserId)
+    .prepare("SELECT * FROM users WHERE auth_provider = ? AND auth_subject = ?")
+    .bind(authProvider, authSubject)
     .first<UserRow>();
 }
 
-export async function createUserFromWorkos(
+export async function createUserFromAuthIdentity(
   db: D1Database,
-  user: WorkosUserData,
+  user: AuthenticatedUserData,
   options: CreateOptions = {}
 ) {
   const id = options.id ?? createId("usr");
@@ -109,7 +113,8 @@ export async function createUserFromWorkos(
     .prepare(
       `INSERT INTO users (
         id,
-        workos_user_id,
+        auth_provider,
+        auth_subject,
         email,
         first_name,
         last_name,
@@ -117,11 +122,12 @@ export async function createUserFromWorkos(
         role,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'owner', ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'owner', ?, ?)`
     )
     .bind(
       id,
-      user.workosUserId,
+      user.authProvider,
+      user.authSubject,
       user.email,
       nullable(user.firstName),
       nullable(user.lastName),
@@ -134,7 +140,7 @@ export async function createUserFromWorkos(
   return getUserById(db, id);
 }
 
-export async function updateUserFromWorkos(db: D1Database, user: WorkosUserData) {
+export async function updateUserFromAuthIdentity(db: D1Database, user: AuthenticatedUserData) {
   await db
     .prepare(
       `UPDATE users
@@ -143,7 +149,8 @@ export async function updateUserFromWorkos(db: D1Database, user: WorkosUserData)
             last_name = ?,
             email_verified = ?,
             updated_at = ?
-        WHERE workos_user_id = ?`
+        WHERE auth_provider = ?
+          AND auth_subject = ?`
     )
     .bind(
       user.email,
@@ -151,11 +158,12 @@ export async function updateUserFromWorkos(db: D1Database, user: WorkosUserData)
       nullable(user.lastName),
       emailVerifiedValue(user.emailVerified),
       nowIso(),
-      user.workosUserId
+      user.authProvider,
+      user.authSubject
     )
     .run();
 
-  return getUserByWorkosUserId(db, user.workosUserId);
+  return getUserByAuthIdentity(db, user.authProvider, user.authSubject);
 }
 
 export function getUserById(db: D1Database, userId: string) {
@@ -339,18 +347,16 @@ export async function createSession(
         user_id,
         token_hash,
         csrf_token_hash,
-        workos_session_id,
         expires_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
       session.userId,
       session.tokenHash,
       nullable(session.csrfTokenHash),
-      nullable(session.workosSessionId),
       session.expiresAt,
       timestamp,
       timestamp
