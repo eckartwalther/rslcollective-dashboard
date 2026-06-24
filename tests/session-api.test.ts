@@ -46,8 +46,7 @@ function createClerkUser(overrides: Partial<ClerkBackendUser> = {}): ClerkBacken
 function createHarness(options: { user?: UserRow | null; tokenSub?: string | null } = {}) {
   const user = options.user ?? createUser();
   const calls = {
-    createdUser: null as AuthenticatedUserData | null,
-    updatedUser: null as AuthenticatedUserData | null
+    createdUser: null as AuthenticatedUserData | null
   };
   const clerkAuth: ClerkAuthDeps = {
     verifyToken: vi.fn(async () => ({ sub: options.tokenSub ?? "user_clerk_test" })) as unknown as ClerkAuthDeps["verifyToken"],
@@ -55,10 +54,6 @@ function createHarness(options: { user?: UserRow | null; tokenSub?: string | nul
     getUserByAuthIdentity: vi.fn(async () => options.user ?? null),
     createUserFromAuthIdentity: vi.fn(async (_db, data) => {
       calls.createdUser = data;
-      return user;
-    }),
-    updateUserFromAuthIdentity: vi.fn(async (_db, data) => {
-      calls.updatedUser = data;
       return user;
     })
   };
@@ -111,8 +106,9 @@ describe("GET /api/session", () => {
     });
   });
 
-  it("updates an existing local user when /api/session is read", async () => {
-    const { calls, route } = createHarness({ user: createUser() });
+  it("returns authenticated for an existing local user without requiring a Clerk profile refresh", async () => {
+    const { calls, clerkAuth, route } = createHarness({ user: createUser() });
+    vi.mocked(clerkAuth.getClerkUser).mockRejectedValueOnce(new Error("Clerk API unavailable"));
     const response = await route.request(
       "/",
       { headers: { Authorization: "Bearer clerk-session-token" } },
@@ -120,12 +116,18 @@ describe("GET /api/session", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(calls.createdUser).toBeNull();
-    expect(calls.updatedUser).toMatchObject({
-      authProvider: "clerk",
-      authSubject: "user_clerk_test",
-      email: "jane@example.com"
+    expect(await readJson(response)).toEqual({
+      authenticated: true,
+      user: {
+        email: "jane@example.com",
+        firstName: "Jane",
+        lastName: "Publisher",
+        role: "owner",
+        hasCompany: true
+      }
     });
+    expect(calls.createdUser).toBeNull();
+    expect(clerkAuth.getClerkUser).not.toHaveBeenCalled();
   });
 
   it("does not expose provider IDs or Clerk token claims", async () => {
@@ -150,6 +152,23 @@ describe("GET /api/session", () => {
     const response = await route.request(
       "/",
       { headers: { Authorization: "Bearer invalid-token" } },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({ authenticated: false });
+  });
+
+  it("fails cleanly when a new Clerk user has no primary email for provisioning", async () => {
+    const { clerkAuth, route } = createHarness({ user: null });
+    vi.mocked(clerkAuth.getClerkUser).mockResolvedValueOnce({
+      id: "user_clerk_test",
+      emailAddresses: []
+    });
+
+    const response = await route.request(
+      "/",
+      { headers: { Authorization: "Bearer clerk-session-token" } },
       env
     );
 

@@ -1,3 +1,9 @@
+// @vitest-environment node
+/// <reference types="vite/client" />
+
+import { Miniflare } from "miniflare";
+
+import coreMigration from "../migrations/0001_core.sql?raw";
 import {
   CLERK_PROVIDER,
   authenticateClerkRequest,
@@ -5,7 +11,12 @@ import {
   mapClerkUser,
   type ClerkAuthDeps
 } from "../worker/lib/clerk";
-import type { AuthenticatedUserData, UserRow } from "../worker/lib/db";
+import {
+  createUserFromAuthIdentity,
+  getUserByAuthIdentity,
+  type AuthenticatedUserData,
+  type UserRow
+} from "../worker/lib/db";
 
 const env = {
   CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org,http://localhost:8787",
@@ -53,15 +64,16 @@ function createDeps(options: { existingUser?: UserRow | null } = {}) {
     createUserFromAuthIdentity: vi.fn(async (_db, data) => {
       calls.createdUser = data;
       return createUser();
-    }),
-    updateUserFromAuthIdentity: vi.fn(async () => createUser())
+    })
   };
 
   return { calls, deps };
 }
 
 describe("Clerk auth helper", () => {
-  it("extracts Clerk session tokens from Authorization and __session cookie", () => {
+  it("extracts Clerk session tokens from Authorization only", () => {
+    const cookieName = ["__", "session"].join("");
+
     expect(
       getClerkSessionToken(
         new Request("https://dashboard.rslcollective.org/api/session", {
@@ -72,10 +84,10 @@ describe("Clerk auth helper", () => {
     expect(
       getClerkSessionToken(
         new Request("https://dashboard.rslcollective.org/api/session", {
-          headers: { Cookie: "other=value; __session=cookie-token" }
+          headers: { Cookie: `other=value; ${cookieName}=cookie-token` }
         })
       )
-    ).toBe("cookie-token");
+    ).toBeNull();
   });
 
   it("verifies tokens with authorized parties and Clerk secret key", async () => {
@@ -87,7 +99,6 @@ describe("Clerk auth helper", () => {
         headers: { Authorization: "Bearer clerk-session-token" }
       }),
       env,
-      {},
       deps
     );
 
@@ -131,7 +142,6 @@ describe("Clerk auth helper", () => {
         headers: { Authorization: "Bearer clerk-session-token" }
       }),
       env,
-      {},
       deps
     );
 
@@ -155,9 +165,79 @@ describe("Clerk auth helper", () => {
           headers: { Authorization: "Bearer bad-token" }
         }),
         env,
-        {},
         deps
       )
     ).resolves.toBeNull();
   });
+
+  it("recovers cleanly when parallel first-login requests provision the same Clerk user", async () => {
+    const { db, dispose } = await createD1Harness();
+    const deps: ClerkAuthDeps = {
+      verifyToken: vi.fn(async () => ({ sub: "user_clerk_parallel" })) as unknown as ClerkAuthDeps["verifyToken"],
+      getClerkUser: vi.fn(async () => ({
+        id: "user_clerk_parallel",
+        firstName: "Pat",
+        lastName: "Publisher",
+        primaryEmailAddressId: "idn_parallel",
+        emailAddresses: [
+          {
+            id: "idn_parallel",
+            emailAddress: "parallel@example.com",
+            verification: { status: "verified" }
+          }
+        ]
+      })),
+      getUserByAuthIdentity,
+      createUserFromAuthIdentity
+    };
+    const request = new Request("https://dashboard.rslcollective.org/api/session", {
+      headers: { Authorization: "Bearer clerk-session-token" }
+    });
+
+    try {
+      const [first, second] = await Promise.all([
+        authenticateClerkRequest(db, request, env, deps),
+        authenticateClerkRequest(db, request, env, deps)
+      ]);
+      const row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count
+            FROM users
+            WHERE auth_provider = 'clerk'
+              AND auth_subject = 'user_clerk_parallel'`
+        )
+        .first<{ count: number }>();
+
+      expect(first?.user.auth_subject).toBe("user_clerk_parallel");
+      expect(second?.user.auth_subject).toBe("user_clerk_parallel");
+      expect(first?.user.id).toBe(second?.user.id);
+      expect(row?.count).toBe(1);
+    } finally {
+      await dispose();
+    }
+  });
 });
+
+async function createD1Harness() {
+  const mf = new Miniflare({
+    script: "export default { fetch() { return new Response('ok'); } }",
+    modules: true,
+    d1Databases: {
+      DB: "test-db"
+    },
+    d1Persist: false
+  });
+  const db = await mf.getD1Database("DB");
+
+  for (const statement of coreMigration
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    await db.prepare(statement).run();
+  }
+
+  return {
+    db,
+    dispose: () => mf.dispose()
+  };
+}

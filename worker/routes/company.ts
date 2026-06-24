@@ -4,6 +4,7 @@ import { companyProfileSchema, type CompanyProfile } from "../../src/schemas/com
 import { requireValidOrigin, type OriginEnv } from "../lib/csrf";
 import {
   createCompanyAndAttachUser as createCompanyAndAttachUserInDb,
+  CompanyConflictError,
   getCompanyForUser as getCompanyForUserInDb,
   updateCompanyForUser as updateCompanyForUserInDb,
   type CompanyData,
@@ -12,6 +13,7 @@ import {
 } from "../lib/db";
 import {
   conflict,
+  serverError,
   unauthenticated,
   validationError
 } from "../lib/responses";
@@ -106,8 +108,13 @@ export function createCompanyRoutes(deps: CompanyRouteDeps = defaultDeps) {
         },
         auth.user.company_id ? 200 : 201
       );
-    } catch {
-      return conflict(c, "Company profile could not be saved.");
+    } catch (error) {
+      if (error instanceof CompanyConflictError) {
+        return conflict(c, "Company profile could not be saved.");
+      }
+
+      logCompanySaveError(c, error);
+      return serverError(c, "Company profile could not be saved.");
     }
   });
 
@@ -124,7 +131,6 @@ async function authenticateCompanyRequest(
     c.env.DB,
     c.req.raw,
     c.env,
-    {},
     deps.clerkAuth
   );
 
@@ -167,4 +173,15 @@ function zodFields(error: ZodError) {
   }
 
   return fields;
+}
+
+function logCompanySaveError(c: Context<{ Bindings: Bindings }>, error: unknown) {
+  console.error(
+    JSON.stringify({
+      event: "company_save_failed",
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      errorName: error instanceof Error ? error.name : typeof error
+    })
+  );
 }

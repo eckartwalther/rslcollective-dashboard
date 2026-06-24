@@ -2,7 +2,6 @@ import { createClerkClient, verifyToken as verifyClerkToken } from "@clerk/backe
 import {
   createUserFromAuthIdentity,
   getUserByAuthIdentity,
-  updateUserFromAuthIdentity,
   type AuthenticatedUserData,
   type UserRow
 } from "./db";
@@ -44,10 +43,6 @@ export type AuthenticatedClerkRequest = {
   user: UserRow;
 };
 
-export type ClerkAuthOptions = {
-  syncUser?: boolean;
-};
-
 export type ClerkAuthDeps = {
   verifyToken: typeof verifyClerkToken;
   getClerkUser: (env: ClerkEnv, userId: string) => Promise<ClerkBackendUser>;
@@ -57,10 +52,6 @@ export type ClerkAuthDeps = {
     authSubject: string
   ) => Promise<UserRow | null>;
   createUserFromAuthIdentity: (
-    db: D1Database,
-    user: AuthenticatedUserData
-  ) => Promise<UserRow | null>;
-  updateUserFromAuthIdentity: (
     db: D1Database,
     user: AuthenticatedUserData
   ) => Promise<UserRow | null>;
@@ -77,15 +68,13 @@ export const defaultClerkAuthDeps: ClerkAuthDeps = {
     return client.users.getUser(userId) as Promise<ClerkBackendUser>;
   },
   getUserByAuthIdentity,
-  createUserFromAuthIdentity,
-  updateUserFromAuthIdentity
+  createUserFromAuthIdentity
 };
 
 export async function authenticateClerkRequest(
   db: D1Database,
   request: Request,
   env: ClerkEnv,
-  options: ClerkAuthOptions = {},
   deps: ClerkAuthDeps = defaultClerkAuthDeps
 ): Promise<AuthenticatedClerkRequest | null> {
   const token = getClerkSessionToken(request);
@@ -109,7 +98,7 @@ export async function authenticateClerkRequest(
 
   const existingUser = await deps.getUserByAuthIdentity(db, CLERK_PROVIDER, clerkUserId);
 
-  if (existingUser && !options.syncUser) {
+  if (existingUser) {
     return {
       clerkUserId,
       tokenClaims,
@@ -122,9 +111,7 @@ export async function authenticateClerkRequest(
   try {
     const clerkUser = await deps.getClerkUser(env, clerkUserId);
     const userData = mapClerkUser(clerkUser);
-    user = existingUser
-      ? await deps.updateUserFromAuthIdentity(db, userData)
-      : await deps.createUserFromAuthIdentity(db, userData);
+    user = await deps.createUserFromAuthIdentity(db, userData);
   } catch {
     return null;
   }
@@ -147,8 +134,7 @@ export function getClerkSessionToken(request: Request) {
     return authorization.slice("Bearer ".length).trim() || null;
   }
 
-  const cookies = parseCookieHeader(request.headers.get("Cookie"));
-  return cookies.get("__session") ?? null;
+  return null;
 }
 
 export function mapClerkUser(user: ClerkBackendUser): AuthenticatedUserData {
@@ -209,22 +195,4 @@ function getPrimaryEmailAddress(user: ClerkBackendUser) {
     user.emailAddresses?.[0] ??
     null
   );
-}
-
-function parseCookieHeader(cookieHeader: string | null) {
-  const cookies = new Map<string, string>();
-
-  if (!cookieHeader) {
-    return cookies;
-  }
-
-  for (const cookie of cookieHeader.split(";")) {
-    const [name, ...valueParts] = cookie.trim().split("=");
-
-    if (name && valueParts.length > 0) {
-      cookies.set(name, valueParts.join("="));
-    }
-  }
-
-  return cookies;
 }

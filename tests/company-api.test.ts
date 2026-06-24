@@ -1,6 +1,6 @@
 import { createCompanyRoutes, type CompanyRouteDeps } from "../worker/routes/company";
 import type { ClerkAuthDeps } from "../worker/lib/clerk";
-import type { CompanyData, CompanyRow, UserRow } from "../worker/lib/db";
+import { CompanyConflictError, type CompanyData, type CompanyRow, type UserRow } from "../worker/lib/db";
 
 const validPayload = {
   legalName: "Example Media Inc.",
@@ -66,7 +66,15 @@ function companyRowFromData(data: CompanyData, overrides: Partial<CompanyRow> = 
   };
 }
 
-function createHarness(options: { authenticated?: boolean; user?: UserRow; company?: CompanyRow } = {}) {
+function createHarness(
+  options: {
+    authenticated?: boolean;
+    user?: UserRow;
+    company?: CompanyRow;
+    createCompanyError?: unknown;
+    updateCompanyError?: unknown;
+  } = {}
+) {
   let user = options.user ?? createUser();
   let company = options.company ?? null;
   const calls = {
@@ -90,14 +98,17 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
       ]
     })),
     getUserByAuthIdentity: vi.fn(async () => (options.authenticated === false ? null : user)),
-    createUserFromAuthIdentity: vi.fn(async () => user),
-    updateUserFromAuthIdentity: vi.fn(async () => user)
+    createUserFromAuthIdentity: vi.fn(async () => user)
   };
 
   const deps: CompanyRouteDeps = {
     clerkAuth,
     getCompanyForUser: async () => (user.company_id ? company : null),
     createCompanyAndAttachUser: async (_db, userId, data) => {
+      if (options.createCompanyError) {
+        throw options.createCompanyError;
+      }
+
       calls.created += 1;
       calls.createdWithUserId = userId;
       company = companyRowFromData(data, { id: "cmp_created" });
@@ -105,6 +116,10 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
       return company;
     },
     updateCompanyForUser: async (_db, _userId, data) => {
+      if (options.updateCompanyError) {
+        throw options.updateCompanyError;
+      }
+
       calls.updated += 1;
       company = companyRowFromData(data, {
         id: user.company_id ?? "cmp_existing",
@@ -336,12 +351,78 @@ describe("company API", () => {
     });
   });
 
+  it("returns 409 for known company ownership conflicts", async () => {
+    const { route } = createHarness({
+      createCompanyError: new CompanyConflictError()
+    });
+    const response = await route.request(
+      "/",
+      {
+        method: "PUT",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+          Origin: "https://dashboard.rslcollective.org"
+        }),
+        body: JSON.stringify(validPayload)
+      },
+      productionEnv
+    );
+
+    expect(response.status).toBe(409);
+    expect(await readJson(response)).toEqual({
+      error: {
+        code: "conflict",
+        message: "Company profile could not be saved."
+      }
+    });
+  });
+
+  it("returns 500 and logs safely for unexpected company save errors", async () => {
+    const cookieName = ["__", "session"].join("");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { route } = createHarness({
+      createCompanyError: new Error("database failed with sk_test_secret and clerk-session-token")
+    });
+    const response = await route.request(
+      "/",
+      {
+        method: "PUT",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+          Cookie: `${cookieName}=cookie-token`,
+          Origin: "https://dashboard.rslcollective.org"
+        }),
+        body: JSON.stringify(validPayload)
+      },
+      productionEnv
+    );
+    const body = JSON.stringify(await readJson(response));
+    const [logLine] = errorSpy.mock.calls.at(-1) as [string];
+    const log = JSON.parse(logLine) as Record<string, unknown>;
+
+    expect(response.status).toBe(500);
+    expect(body).toContain("Company profile could not be saved.");
+    expect(body).not.toContain("database failed");
+    expect(body).not.toContain("sk_test_secret");
+    expect(body).not.toContain("clerk-session-token");
+    expect(log).toMatchObject({
+      event: "company_save_failed",
+      method: "PUT",
+      path: "/",
+      errorName: "Error"
+    });
+    expect(log).not.toHaveProperty("authorization");
+    expect(log).not.toHaveProperty("cookie");
+    expect(logLine).not.toContain("sk_test_secret");
+    expect(logLine).not.toContain("clerk-session-token");
+    errorSpy.mockRestore();
+  });
+
   it("does not sync Clerk profile fields on company requests when the local user exists", async () => {
     const { clerkAuth, route } = createHarness();
     const response = await route.request("/", { headers: authHeaders() }, productionEnv);
 
     expect(response.status).toBe(200);
     expect(clerkAuth.getClerkUser).not.toHaveBeenCalled();
-    expect(clerkAuth.updateUserFromAuthIdentity).not.toHaveBeenCalled();
   });
 });

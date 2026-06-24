@@ -41,9 +41,3 @@ export const clerkAuthAppearance = {
     }
   }
 };
-
-export const clerkSignUpAppearance = {
-  elements: {
-    ...clerkAuthAppearance.elements
-  }
-};

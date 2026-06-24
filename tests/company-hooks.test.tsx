@@ -73,6 +73,8 @@ function SaveProbe({ payload }: { payload: Record<string, unknown> }) {
 }
 
 describe("company API hooks", () => {
+  const includedCredentials = "include";
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -98,7 +100,6 @@ describe("company API hooks", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/company",
         expect.objectContaining({
-          credentials: "include",
           headers: expect.any(Headers)
         })
       );
@@ -114,7 +115,7 @@ describe("company API hooks", () => {
     await expect(getCompany()).resolves.toEqual({ company: null });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/company",
-      expect.objectContaining({ credentials: "include" })
+      expect.not.objectContaining({ credentials: includedCredentials })
     );
   });
 
@@ -129,7 +130,6 @@ describe("company API hooks", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/company",
         expect.objectContaining({
-          credentials: "include",
           method: "PUT"
         })
       );

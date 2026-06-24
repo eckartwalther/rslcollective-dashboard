@@ -39,7 +39,6 @@ export function apiRequest(path: string, init: RequestInit = {}, authToken?: str
   }
 
   return fetch(path, {
-    credentials: "include",
     ...init,
     headers
   });

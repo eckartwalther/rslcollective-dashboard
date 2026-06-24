@@ -29,7 +29,6 @@ export function createSessionRoutes(deps: SessionRouteDeps = defaultDeps) {
       c.env.DB,
       c.req.raw,
       c.env,
-      { syncUser: true },
       deps.clerkAuth
     );
 

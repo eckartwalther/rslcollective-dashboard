@@ -5,14 +5,16 @@ import { Miniflare } from "miniflare";
 
 import coreMigration from "../migrations/0001_core.sql?raw";
 import {
+  createUserFromAuthIdentity,
   createCompanyAndAttachUser,
   getCompanyForUser,
   getUserById,
+  type AuthenticatedUserData,
   type CompanyData,
   type CompanyRow
 } from "../worker/lib/db";
 import { createId } from "../worker/lib/ids";
-import { addDaysIso, nowIso } from "../worker/lib/time";
+import { nowIso } from "../worker/lib/time";
 
 type D1Harness = {
   db: D1Database;
@@ -175,11 +177,10 @@ describe("database helper utilities", () => {
     expect(new Set([userId, companyId]).size).toBe(2);
   });
 
-  it("formats timestamps as ISO strings and adds days deterministically", () => {
+  it("formats timestamps as ISO strings", () => {
     const base = new Date("2026-06-11T00:00:00.000Z");
 
     expect(nowIso(base)).toBe("2026-06-11T00:00:00.000Z");
-    expect(addDaysIso(30, base)).toBe("2026-07-11T00:00:00.000Z");
   });
 
   it("does not create a local sessions table", async () => {
@@ -191,6 +192,42 @@ describe("database helper utilities", () => {
         .all<{ name: string }>();
 
       expect(columns.results).toEqual([]);
+    } finally {
+      await dispose();
+    }
+  });
+});
+
+describe("createUserFromAuthIdentity D1 idempotency", () => {
+  it("recovers cleanly when parallel first-login requests provision the same Clerk user", async () => {
+    const { db, dispose } = await createD1Harness();
+    const userData: AuthenticatedUserData = {
+      authProvider: "clerk",
+      authSubject: "user_clerk_parallel",
+      email: "parallel@example.com",
+      firstName: "Parallel",
+      lastName: "Publisher",
+      emailVerified: true
+    };
+
+    try {
+      const [first, second] = await Promise.all([
+        createUserFromAuthIdentity(db, userData, { id: "usr_parallel_a", timestamp }),
+        createUserFromAuthIdentity(db, userData, { id: "usr_parallel_b", timestamp })
+      ]);
+      const row = await db
+        .prepare(
+          `SELECT COUNT(*) AS count
+            FROM users
+            WHERE auth_provider = 'clerk'
+              AND auth_subject = 'user_clerk_parallel'`
+        )
+        .first<{ count: number }>();
+
+      expect(first?.auth_subject).toBe("user_clerk_parallel");
+      expect(second?.auth_subject).toBe("user_clerk_parallel");
+      expect(first?.id).toBe(second?.id);
+      expect(row?.count).toBe(1);
     } finally {
       await dispose();
     }

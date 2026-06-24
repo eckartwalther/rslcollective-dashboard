@@ -2,7 +2,7 @@ import { SignUp, useAuth } from "@clerk/react";
 import { Center, Loader } from "@mantine/core";
 import { Navigate } from "react-router-dom";
 import { useClerkAuthCopyMode } from "../app/providers";
-import { AuthShell, clerkSignUpAppearance } from "../components/auth/AuthShell";
+import { AuthShell, clerkAuthAppearance } from "../components/auth/AuthShell";
 
 export function RegisterPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -24,7 +24,7 @@ export function RegisterPage() {
   return (
     <AuthShell>
       <SignUp
-        appearance={clerkSignUpAppearance}
+        appearance={clerkAuthAppearance}
         routing="path"
         path="/register"
         signInUrl="/login"

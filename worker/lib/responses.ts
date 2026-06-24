@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 type ErrorCode =
-  | "not_implemented"
   | "unauthenticated"
   | "validation_error"
   | "forbidden"
@@ -25,10 +24,6 @@ export function errorResponse(
     },
     status
   );
-}
-
-export function notImplemented(c: Context, message: string) {
-  return errorResponse(c, 501, "not_implemented", message);
 }
 
 export function unauthenticated(c: Context) {

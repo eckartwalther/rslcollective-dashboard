@@ -258,8 +258,7 @@ function createAuthenticatedCompanyRoute() {
       ]
     })),
     getUserByAuthIdentity: vi.fn(async () => createUser()),
-    createUserFromAuthIdentity: vi.fn(async () => createUser()),
-    updateUserFromAuthIdentity: vi.fn(async () => createUser())
+    createUserFromAuthIdentity: vi.fn(async () => createUser())
   };
   const deps: CompanyRouteDeps = {
     clerkAuth,

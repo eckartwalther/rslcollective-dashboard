@@ -65,6 +65,13 @@ type CreateOptions = {
   timestamp?: string;
 };
 
+export class CompanyConflictError extends Error {
+  constructor(message = "Company creation failed or user already has a company.") {
+    super(message);
+    this.name = "CompanyConflictError";
+  }
+}
+
 function nullable(value: string | null | undefined) {
   return value ?? null;
 }
@@ -105,7 +112,8 @@ export async function createUserFromAuthIdentity(
         role,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'owner', ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'owner', ?, ?)
+      ON CONFLICT(auth_provider, auth_subject) DO NOTHING`
     )
     .bind(
       id,
@@ -117,32 +125,6 @@ export async function createUserFromAuthIdentity(
       emailVerifiedValue(user.emailVerified),
       timestamp,
       timestamp
-    )
-    .run();
-
-  return getUserById(db, id);
-}
-
-export async function updateUserFromAuthIdentity(db: D1Database, user: AuthenticatedUserData) {
-  await db
-    .prepare(
-      `UPDATE users
-        SET email = ?,
-            first_name = ?,
-            last_name = ?,
-            email_verified = ?,
-            updated_at = ?
-        WHERE auth_provider = ?
-          AND auth_subject = ?`
-    )
-    .bind(
-      user.email,
-      nullable(user.firstName),
-      nullable(user.lastName),
-      emailVerifiedValue(user.emailVerified),
-      nowIso(),
-      user.authProvider,
-      user.authSubject
     )
     .run();
 
@@ -174,7 +156,7 @@ export async function createCompanyAndAttachUser(
   const user = await getUserById(db, userId);
 
   if (!user || user.company_id !== null) {
-    throw new Error("Company creation failed or user already has a company.");
+    throw new CompanyConflictError();
   }
 
   const companyId = options.id ?? createId("cmp");
@@ -255,13 +237,13 @@ export async function createCompanyAndAttachUser(
   ]);
 
   if (attachResult.meta.changes !== 1 || cleanupResult.meta.changes !== 0) {
-    throw new Error("Company creation failed or user already has a company.");
+    throw new CompanyConflictError();
   }
 
   const attachedCompany = await getCompanyForUser(db, userId);
 
   if (!attachedCompany || attachedCompany.id !== companyId) {
-    throw new Error("Company creation failed or user already has a company.");
+    throw new CompanyConflictError();
   }
 
   return attachedCompany;
