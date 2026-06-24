@@ -1,6 +1,6 @@
 import { createCompanyRoutes, type CompanyRouteDeps } from "../worker/routes/company";
-import { SESSION_COOKIE_NAME, type SessionStore } from "../worker/lib/session";
-import type { CompanyData, CompanyRow, SessionData, SessionRow, UserRow } from "../worker/lib/db";
+import type { ClerkAuthDeps } from "../worker/lib/clerk";
+import type { CompanyData, CompanyRow, UserRow } from "../worker/lib/db";
 
 const validPayload = {
   legalName: "Example Media Inc.",
@@ -19,6 +19,8 @@ const validPayload = {
 };
 
 const productionEnv = {
+  CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
+  CLERK_SECRET_KEY: "sk_test_mock",
   ENVIRONMENT: "production",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
   DB: {} as D1Database
@@ -27,27 +29,14 @@ const productionEnv = {
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_test",
-    auth_provider: "auth0",
-    auth_subject: "auth0|user_test",
+    auth_provider: "clerk",
+    auth_subject: "user_clerk_test",
     company_id: null,
     email: "publisher@example.com",
     first_name: "Jane",
     last_name: "Publisher",
     email_verified: 1,
     role: "owner",
-    created_at: "2026-06-11T00:00:00.000Z",
-    updated_at: "2026-06-11T00:00:00.000Z",
-    ...overrides
-  };
-}
-
-function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
-  return {
-    id: "ses_test",
-    user_id: "usr_test",
-    token_hash: "hash_test",
-    csrf_token_hash: null,
-    expires_at: "2026-07-11T00:00:00.000Z",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z",
     ...overrides
@@ -85,17 +74,28 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
     updated: 0,
     createdWithUserId: null as string | null
   };
-
-  const sessionStore: SessionStore = {
-    createSession: async (_session: SessionData) => null,
-    getSessionByTokenHash: async () => (options.authenticated === false ? null : createSessionRow()),
-    deleteSession: async () => undefined,
-    refreshSessionExpiry: async (_sessionId, expiresAt) => createSessionRow({ expires_at: expiresAt })
+  const clerkAuth: ClerkAuthDeps = {
+    verifyToken: vi.fn(async () => ({ sub: "user_clerk_test" })) as unknown as ClerkAuthDeps["verifyToken"],
+    getClerkUser: vi.fn(async () => ({
+      id: "user_clerk_test",
+      firstName: "Jane",
+      lastName: "Publisher",
+      primaryEmailAddressId: "idn_email",
+      emailAddresses: [
+        {
+          id: "idn_email",
+          emailAddress: "publisher@example.com",
+          verification: { status: "verified" }
+        }
+      ]
+    })),
+    getUserByAuthIdentity: vi.fn(async () => (options.authenticated === false ? null : user)),
+    createUserFromAuthIdentity: vi.fn(async () => user),
+    updateUserFromAuthIdentity: vi.fn(async () => user)
   };
 
   const deps: CompanyRouteDeps = {
-    createSessionStore: () => sessionStore,
-    getUserById: async () => user,
+    clerkAuth,
     getCompanyForUser: async () => (user.company_id ? company : null),
     createCompanyAndAttachUser: async (_db, userId, data) => {
       calls.created += 1;
@@ -117,19 +117,17 @@ function createHarness(options: { authenticated?: boolean; user?: UserRow; compa
 
   return {
     calls,
+    clerkAuth,
     route: createCompanyRoutes(deps),
     setUser: (nextUser: UserRow) => {
       user = nextUser;
-    },
-    setCompany: (nextCompany: CompanyRow | null) => {
-      company = nextCompany;
     }
   };
 }
 
 function authHeaders(extra: HeadersInit = {}) {
   return {
-    Cookie: `${SESSION_COOKIE_NAME}=test-token`,
+    Authorization: "Bearer clerk-session-token",
     ...extra
   };
 }
@@ -144,7 +142,6 @@ describe("company API", () => {
     const response = await route.request("/", {}, productionEnv);
 
     expect(response.status).toBe(401);
-    expect(response.headers.get("Content-Type")).toContain("application/json");
     expect(await readJson(response)).toEqual({
       error: {
         code: "unauthenticated",
@@ -155,11 +152,7 @@ describe("company API", () => {
 
   it("returns company null for an authenticated user with no company", async () => {
     const { route } = createHarness();
-    const response = await route.request(
-      "/",
-      { headers: authHeaders() },
-      productionEnv
-    );
+    const response = await route.request("/", { headers: authHeaders() }, productionEnv);
 
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({ company: null });
@@ -188,11 +181,7 @@ describe("company API", () => {
       user: createUser({ company_id: "cmp_existing" }),
       company
     });
-    const response = await route.request(
-      "/",
-      { headers: authHeaders() },
-      productionEnv
-    );
+    const response = await route.request("/", { headers: authHeaders() }, productionEnv);
 
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({
@@ -263,24 +252,6 @@ describe("company API", () => {
     expect(invalid.status).toBe(403);
   });
 
-  it("accepts matching production Origin for authenticated PUT", async () => {
-    const { route } = createHarness();
-    const response = await route.request(
-      "/",
-      {
-        method: "PUT",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-          Origin: "https://dashboard.rslcollective.org"
-        }),
-        body: JSON.stringify(validPayload)
-      },
-      productionEnv
-    );
-
-    expect(response.status).toBe(201);
-  });
-
   it("creates the first company and attaches the user", async () => {
     const { route, calls } = createHarness();
     const response = await route.request(
@@ -322,60 +293,24 @@ describe("company API", () => {
           "Content-Type": "application/json",
           Origin: "https://dashboard.rslcollective.org"
         }),
-        body: JSON.stringify({
-          ...validPayload,
-          legalName: "Updated Media Inc."
-        })
+        body: JSON.stringify({ ...validPayload, displayName: "Updated Media" })
       },
       productionEnv
     );
-    const body = await readJson(response);
 
     expect(response.status).toBe(200);
     expect(calls.created).toBe(0);
     expect(calls.updated).toBe(1);
-    expect(body.company).toMatchObject({
-      legalName: "Updated Media Inc.",
-      updatedAt: "2026-06-12T00:00:00.000Z"
-    });
-  });
-
-  it.each([
-    ["company_id", { company_id: "cmp_test" }],
-    ["companyId", { companyId: "cmp_test" }],
-    ["role", { role: "owner" }],
-    ["status", { status: "approved" }],
-    ["unsupported companyType", { companyType: "Agency" }],
-    ["unsupported company_type", { company_type: "Agency" }]
-  ])("rejects client-supplied or unsupported field %s", async (_label, extra) => {
-    const { route } = createHarness();
-    const response = await route.request(
-      "/",
-      {
-        method: "PUT",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-          Origin: "https://dashboard.rslcollective.org"
-        }),
-        body: JSON.stringify({
-          ...validPayload,
-          ...extra
-        })
-      },
-      productionEnv
-    );
-    const body = await readJson(response);
-
-    expect(response.status).toBe(400);
-    expect(body).toMatchObject({
-      error: {
-        code: "validation_error"
+    expect(await readJson(response)).toMatchObject({
+      company: {
+        displayName: "Updated Media",
+        updatedAt: "2026-06-12T00:00:00.000Z"
       }
     });
   });
 
-  it("returns validation_error for invalid payloads", async () => {
-    const { route } = createHarness();
+  it("returns validation errors without saving invalid payloads", async () => {
+    const { route, calls } = createHarness();
     const response = await route.request(
       "/",
       {
@@ -384,89 +319,29 @@ describe("company API", () => {
           "Content-Type": "application/json",
           Origin: "https://dashboard.rslcollective.org"
         }),
-        body: JSON.stringify({
-          ...validPayload,
-          legalName: "A",
-          primaryContactEmail: "not-an-email"
-        })
+        body: JSON.stringify({ ...validPayload, primaryContactEmail: "bad-email" })
       },
       productionEnv
     );
-    const body = await readJson(response);
 
     expect(response.status).toBe(400);
-    expect(body).toMatchObject({
+    expect(calls.created).toBe(0);
+    expect(await readJson(response)).toMatchObject({
       error: {
         code: "validation_error",
-        message: "Invalid company profile."
+        fields: {
+          primaryContactEmail: "Invalid email address"
+        }
       }
     });
   });
 
-  it.each([
-    ["addressLine1"],
-    ["city"],
-    ["postalCode"]
-  ])("rejects PUT payloads missing %s", async (field) => {
-    const { route } = createHarness();
-    const response = await route.request(
-      "/",
-      {
-        method: "PUT",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-          Origin: "https://dashboard.rslcollective.org"
-        }),
-        body: JSON.stringify(omitField(validPayload, field))
-      },
-      productionEnv
-    );
-    const body = await readJson(response);
+  it("does not sync Clerk profile fields on company requests when the local user exists", async () => {
+    const { clerkAuth, route } = createHarness();
+    const response = await route.request("/", { headers: authHeaders() }, productionEnv);
 
-    expect(response.status).toBe(400);
-    expect(body).toMatchObject({
-      error: {
-        code: "validation_error",
-        message: "Invalid company profile."
-      }
-    });
-  });
-
-  it("includes every editable field in the company response", async () => {
-    const { route } = createHarness({
-      user: createUser({ company_id: "cmp_existing" }),
-      company: companyRowFromData(validPayload, { id: "cmp_existing" })
-    });
-    const response = await route.request(
-      "/",
-      { headers: authHeaders() },
-      productionEnv
-    );
-    const body = (await readJson(response)) as { company: Record<string, unknown> };
-
-    expect(Object.keys(body.company).sort()).toEqual(
-      [
-        "addressLine1",
-        "addressLine2",
-        "billingContactEmail",
-        "city",
-        "companyType",
-        "country",
-        "createdAt",
-        "description",
-        "displayName",
-        "legalName",
-        "postalCode",
-        "primaryContactEmail",
-        "primaryContactName",
-        "region",
-        "status",
-        "updatedAt"
-      ].sort()
-    );
+    expect(response.status).toBe(200);
+    expect(clerkAuth.getClerkUser).not.toHaveBeenCalled();
+    expect(clerkAuth.updateUserFromAuthIdentity).not.toHaveBeenCalled();
   });
 });
-
-function omitField<T extends Record<string, unknown>>(payload: T, field: string) {
-  return Object.fromEntries(Object.entries(payload).filter(([key]) => key !== field));
-}

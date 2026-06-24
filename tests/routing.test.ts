@@ -1,11 +1,8 @@
 import app from "../worker/index";
 
 const env = {
-  AUTH0_ISSUER_BASE_URL: "https://tenant.example.auth0.com",
-  AUTH0_CLIENT_ID: "client_test",
-  AUTH0_CLIENT_SECRET: "secret_test",
-  AUTH0_CALLBACK_URL: "https://dashboard.rslcollective.org/auth/callback",
-  SESSION_SECRET: "test-session-secret",
+  CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
+  CLERK_SECRET_KEY: "sk_test_mock",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
   ENVIRONMENT: "production",
   DB: {} as D1Database,
@@ -16,91 +13,49 @@ const env = {
 
 const localEnv = {
   ...env,
-  AUTH0_CALLBACK_URL: undefined,
+  CLERK_AUTHORIZED_PARTIES: "http://localhost:8787,http://127.0.0.1:8787",
   DASHBOARD_BASE_URL: "http://localhost:8787",
   ENVIRONMENT: "development"
 };
 
 describe("Worker routing", () => {
-  it("/auth/callback remains Worker-handled instead of SPA-handled", async () => {
+  it("/auth/callback is no longer an authentication route", async () => {
     const response = await app.fetch(
       new Request("https://dashboard.rslcollective.org/auth/callback?code=test"),
       env
     );
-    const body = await response.text();
 
-    expect(response.status).toBe(400);
-    expect(response.headers.get("Content-Type")).toContain("text/html");
-    expect(body).toContain("Sign-in link expired");
-    expect(body).not.toContain("spa asset fallback");
-  });
-
-  it("accepts localhost host in development when DASHBOARD_BASE_URL is localhost", async () => {
-    const response = await app.fetch(
-      new Request("http://localhost:8787/login", {
-        headers: { Host: "localhost:8787" }
-      }),
-      localEnv
-    );
-    const location = response.headers.get("Location");
-
-    expect(response.status).toBe(302);
-    expect(location).toContain("https://tenant.example.auth0.com/authorize");
-    expect(location).toContain("redirect_uri=http%3A%2F%2Flocalhost%3A8787%2Fauth%2Fcallback");
-  });
-
-  it("accepts 127.0.0.1 host in development when DASHBOARD_BASE_URL is localhost", async () => {
-    const response = await app.fetch(
-      new Request("http://127.0.0.1:8787/login", {
-        headers: { Host: "127.0.0.1:8787" }
-      }),
-      localEnv
-    );
-
-    expect(response.status).toBe(302);
-  });
-
-  it("keeps /register localhost behavior unchanged", async () => {
-    const response = await app.fetch(
-      new Request("http://localhost:8787/register", {
-        headers: { Host: "localhost:8787" }
-      }),
-      localEnv
-    );
-    const location = response.headers.get("Location");
-
-    expect(response.status).toBe(302);
-    expect(location).toContain("screen_hint=signup");
-  });
-
-  it("keeps /logout Origin validation unchanged behind a valid local host", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const response = await app.fetch(
-      new Request("http://localhost:8787/logout", {
-        method: "POST",
-        headers: {
-          Host: "localhost:8787",
-          Origin: "https://evil.example"
-        }
-      }),
-      localEnv
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toMatchObject({
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
       error: {
-        code: "forbidden",
-        message: "Request origin is not allowed."
+        code: "not_found"
       }
     });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"event":"origin_rejected"')
-    );
-    warnSpy.mockRestore();
   });
 
-  it("keeps /api/company local unauthenticated behavior unchanged behind a valid local host", async () => {
+  it.each(["/login", "/login/sso-callback", "/register", "/register/verify", "/logout"])(
+    "serves the SPA for Clerk route %s",
+    async (path) => {
+      const response = await app.fetch(
+        new Request(`http://localhost:8787${path}`, {
+          headers: { Host: "localhost:8787" }
+        }),
+        localEnv
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("spa asset fallback");
+    }
+  );
+
+  it("serves the SPA for root so Clerk can route by auth state", async () => {
+    const response = await app.fetch(new Request("http://localhost:8787/"), localEnv);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("spa asset fallback");
+  });
+
+  it("keeps /api/company local unauthenticated behavior behind a valid local host", async () => {
     const response = await app.fetch(
       new Request("http://localhost:8787/api/company", {
         method: "PUT",

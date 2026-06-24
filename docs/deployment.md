@@ -1,215 +1,157 @@
 # Deployment
 
-This app deploys as a single Cloudflare Worker that serves both the Vite SPA assets and the Hono Worker routes. Do not deploy from an implicit Wrangler account: the production Cloudflare account must be the account that controls `rslcollective.org` and `dashboard.rslcollective.org`.
+This dashboard is a Vite React app served by a Cloudflare Worker. Clerk owns browser sessions. Worker API routes verify Clerk session tokens and keep app-owned user/company records in D1.
 
-## Cloudflare Account Targeting
+## Runtime Model
 
-`wrangler.jsonc` is the local/default Worker config used by `pnpm worker:dev`. It must remain local-safe and must not include the production `dashboard.rslcollective.org` route or `custom_domain` entry. It must include Worker-first routing for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
+- `/login` and `/register` are React routes that render Clerk `<SignIn />` and `<SignUp />`.
+- Frontend API requests call Clerk `getToken()` and send `Authorization: Bearer <token>`.
+- Worker API routes call `@clerk/backend` `verifyToken()` with `CLERK_SECRET_KEY` and `authorizedParties`.
+- D1 stores `users` and `companies`; it does not store local sessions.
+- D1 user identity is `auth_provider = "clerk"` and `auth_subject = <Clerk user id>`.
 
-`wrangler.production.jsonc` is the explicit production deploy config used by `pnpm worker:deploy`. It mirrors the Worker, assets, and D1 bindings and adds the production custom-domain route:
+## Required Local Environment
 
-```jsonc
-{
-  "vars": {
-    "AUTH0_ISSUER_BASE_URL": "https://login.rslcollective.org",
-    "AUTH0_CLIENT_ID": "Rh6L36YoEzjBtpBVTy2w8gqR03WxgdcN",
-    "AUTH0_CALLBACK_URL": "https://dashboard.rslcollective.org/auth/callback",
-    "DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
-    "ENVIRONMENT": "production"
-  },
-  "routes": [
-    {
-      "pattern": "dashboard.rslcollective.org",
-      "custom_domain": true
-    }
-  ]
-}
-```
-
-The `account_id` is not a secret, but it must be correct. The `database_id` must be for the `rsl-collective-dashboard` D1 database in that same Cloudflare account. Do not guess either value.
-
-Before production deploy, run:
+Create `.env.local` for Vite:
 
 ```sh
-pnpm exec wrangler whoami
+VITE_CLERK_PUBLISHABLE_KEY=<Clerk development publishable key>
 ```
 
-Confirm the active Wrangler account matches `account_id` in `wrangler.production.jsonc`. Local development may use `wrangler login`. CI or scripted deployment should use `CLOUDFLARE_API_TOKEN` and, where useful, `CLOUDFLARE_ACCOUNT_ID`.
+Create `.dev.vars` or pass Worker vars/secrets for Wrangler local development:
 
-## Runtime Secrets And Variables
-
-Required Worker runtime bindings:
-
-- `ASSETS` Workers Assets binding
-- `DB` D1 binding
-- `AUTH0_ISSUER_BASE_URL`
-- `AUTH0_CLIENT_ID`
-- `AUTH0_CALLBACK_URL`
-- `AUTH0_CLIENT_SECRET`
-- `SESSION_SECRET`
-- `DASHBOARD_BASE_URL`
-- `ENVIRONMENT=production`
-
-`AUTH0_CLIENT_SECRET` and `SESSION_SECRET` must be stored as Worker secrets. `AUTH0_CLIENT_ID`, `AUTH0_ISSUER_BASE_URL`, `AUTH0_CALLBACK_URL`, `DASHBOARD_BASE_URL`, and `ENVIRONMENT` are production variables in `wrangler.production.jsonc`.
-
-`ENVIRONMENT=production` is required in production. The Worker checks this value to set production `Secure` session cookies, require `Origin` on protected mutating requests, and reject mismatched production origins. Do not set `ENVIRONMENT` with `wrangler secret put`.
-
-Do not expose Auth0 access tokens, ID tokens, refresh tokens, or client secrets through Vite client variables. Do not put Auth0 or Cloudflare credentials in `VITE_` variables.
-
-Production values:
-
-```txt
-AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org
-AUTH0_CLIENT_ID=<Auth0 Production Regular Web Application Client ID>
-AUTH0_CALLBACK_URL=https://dashboard.rslcollective.org/auth/callback
-DASHBOARD_BASE_URL=https://dashboard.rslcollective.org
-ENVIRONMENT=production
-```
-
-Local values:
-
-```txt
-AUTH0_ISSUER_BASE_URL=https://<tenant>.auth0.com
-AUTH0_CLIENT_ID=<Auth0 Development Regular Web Application Client ID>
+```sh
+CLERK_SECRET_KEY=<Clerk development secret key>
+CLERK_AUTHORIZED_PARTIES=http://localhost:8787,http://127.0.0.1:8787
 DASHBOARD_BASE_URL=http://localhost:8787
 ENVIRONMENT=development
 ```
 
-For local development, `AUTH0_CALLBACK_URL` may be omitted so the Worker derives `http://localhost:8787/auth/callback` from `DASHBOARD_BASE_URL`. Development Origin validation accepts `DASHBOARD_BASE_URL` when configured and local Worker origins on `localhost` or `127.0.0.1` using HTTP or HTTPS on ports `8787` and `8788`. Production still requires the request `Origin` to match `DASHBOARD_BASE_URL`.
+Do not put `CLERK_SECRET_KEY` or future `CLERK_JWT_KEY` values in Vite `VITE_` variables.
 
-Secret setup command patterns:
+## Production Worker Configuration
 
-```sh
-pnpm exec wrangler secret put AUTH0_CLIENT_SECRET --config wrangler.production.jsonc
-pnpm exec wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
+`wrangler.production.jsonc` stores non-secret production vars:
+
+```json
+{
+  "vars": {
+    "CLERK_AUTHORIZED_PARTIES": "https://dashboard.rslcollective.org",
+    "DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
+    "ENVIRONMENT": "production"
+  }
+}
 ```
 
-## Auth0
-
-Use an Auth0 Regular Web Application. The Cloudflare Worker is the confidential OIDC client and performs the Authorization Code Flow server-side. React must not use the Auth0 SPA SDK and must not receive Auth0 tokens.
-
-Production Auth0 application configuration:
-
-- Application type: Regular Web Application.
-- Allowed Callback URLs: `https://dashboard.rslcollective.org/auth/callback`.
-- Allowed Logout URLs: `https://dashboard.rslcollective.org/login`.
-- Application Login URI: `https://dashboard.rslcollective.org/login`.
-- Allowed Web Origins: secondary for this architecture; add `https://dashboard.rslcollective.org` only if future browser-side Auth0 SDK behavior is introduced.
-- Grant types: Authorization Code.
-- ID token signing algorithm: RS256.
-- Universal Login: enabled and branded in Auth0.
-
-Custom domain setup for production:
-
-- Configure `login.rslcollective.org` in Auth0 Branding or Custom Domains.
-- Use Auth0-managed certificates unless there is a specific reason to self-manage certificates.
-- Add the Auth0-provided CNAME in Cloudflare as DNS-only, not proxied, at least through validation.
-- Keep the CNAME present for certificate renewal.
-- After validation, set `AUTH0_ISSUER_BASE_URL=https://login.rslcollective.org`.
-
-Staging should use a separate Auth0 tenant or application and separate Worker/D1 runtime values. Auth0 recommends separate tenants for development, staging, and production isolation. A staging custom login domain such as `login-staging.rslcollective.org` is recommended if staging needs to mirror production branding.
-
-## D1
-
-Cloudflare requirements:
-
-- D1 database `rsl-collective-dashboard` exists in the same Cloudflare account as `account_id`.
-- D1 binding name is `DB`.
-- `d1_databases[0].database_id` in both Wrangler configs belongs to that same account.
-- Remote migration is applied before production smoke testing.
-
-Commands:
+Set production secrets with Wrangler:
 
 ```sh
-pnpm exec wrangler d1 create rsl-collective-dashboard --config wrangler.production.jsonc
+pnpm exec wrangler secret put CLERK_SECRET_KEY --config wrangler.production.jsonc
+```
+
+`CLERK_JWT_KEY` is not required for the initial implementation. Add it later only if networkless verification is required:
+
+```sh
+pnpm exec wrangler secret put CLERK_JWT_KEY --config wrangler.production.jsonc
+```
+
+## Clerk Dashboard
+
+Configure the Clerk development and production instances separately.
+
+Localhost:
+
+- Use the development instance.
+- Do not rely on Clerk Dashboard component-path settings for sign-in or sign-up; the React app configures `/login`, `/register`, and `/dashboard` in code.
+- Include `http://localhost:8787` and `http://127.0.0.1:8787` in Worker `CLERK_AUTHORIZED_PARTIES`.
+
+Production domain:
+
+- Create a production instance for `dashboard.rslcollective.org`.
+- Set the production Home URL to `https://dashboard.rslcollective.org`.
+- Do not configure custom OAuth consent pages; use Clerk's default Account Portal consent flow.
+- Add Clerk-required DNS records.
+- If Clerk asks for DNS validation records in Cloudflare, keep those validation records DNS-only while validating.
+- Enable allowed subdomains and allow only the dashboard subdomain needed by this app.
+
+Authentication:
+
+- Enable email as an identifier.
+- Require email verification.
+- Prefer email verification codes over email links for B2B deliverability.
+- Enable Google social connection.
+- Enable Microsoft Azure Entra ID social connection.
+- Use custom Google and Microsoft credentials in production.
+- Keep the one-user-one-company app model; do not enable Clerk Organizations for this migration.
+
+Email and branding:
+
+- Set the application name and logo to RSL Internet Collective.
+- Configure Clerk production email DNS records for SPF/DKIM.
+- Add a DMARC record for the sending domain.
+- Keep real mailboxes for active sender addresses such as `notifications@rslcollective.org` or `noreply@rslcollective.org`.
+- Keep default Clerk email templates initially unless there is a clear deliverability-safe reason to customize them.
+
+## D1 Reset
+
+Current local and production D1 data is disposable. Reset instead of migrating old provider data.
+
+Local:
+
+```sh
 pnpm db:migrate:local
+```
+
+Production:
+
+1. Create a fresh production D1 database or intentionally discard the existing one.
+2. Update `wrangler.production.jsonc` with the production D1 `database_id`.
+3. Apply the baseline schema:
+
+```sh
 pnpm db:migrate:remote
 ```
 
-## Workers Assets And Routing
-
-Cloudflare requirements:
-
-- `dashboard.rslcollective.org` routes to this Worker.
-- The production route exists only in `wrangler.production.jsonc`; the local/default `wrangler.jsonc` intentionally has no production `routes` or `custom_domain` entry.
-- Workers Assets SPA fallback is configured with `not_found_handling: "single-page-application"`.
-- `run_worker_first` is configured for `/`, `/register`, `/login`, `/auth/*`, `/logout`, and `/api/*`.
-- `/dashboard` and nested dashboard routes are served by the SPA fallback.
-- `/auth/callback` remains Worker-handled and must not be swallowed by the SPA fallback.
-
-Production deploy:
+## Local Verification
 
 ```sh
 pnpm check
-pnpm build
 pnpm test
+pnpm build
+pnpm db:migrate:local
+pnpm worker:dev
+```
+
+Then verify:
+
+- `http://localhost:8787/login` renders Clerk sign-in.
+- `http://localhost:8787/register` renders Clerk sign-up.
+- Signing in lands on `/dashboard`.
+- `/api/session` returns `{ "authenticated": true, "user": ... }` after sign-in.
+- `/api/company` returns `401` without a valid Clerk token.
+- Creating a publisher profile returns `201`.
+- Sign-out returns to `/login`.
+
+## Production Deploy
+
+```sh
+pnpm check
+pnpm test
+pnpm build
 pnpm exec wrangler whoami
 pnpm db:migrate:remote
 pnpm worker:deploy
 ```
 
-## Local Worker Smoke Tests
+Production smoke test:
 
-Use Wrangler for local auth/API route testing. Vite-only development is useful for UI work, but it does not exercise Worker-first routes, D1 bindings, Origin behavior, Auth0 redirects, or SPA asset fallback.
-
-Start the local Worker:
-
-```sh
-pnpm db:migrate:local
-pnpm worker:dev
-```
-
-Then run these checks against the local Worker:
-
-```sh
-curl -i http://localhost:8787/
-curl -i http://localhost:8787/register
-curl -i http://localhost:8787/login
-curl -i -X PUT http://localhost:8787/api/company \
-  -H "Origin: http://localhost:8787" \
-  -H "Content-Type: application/json" \
-  --data '{}'
-curl -i "http://localhost:8787/auth/callback?code=test&state=test"
-curl -i http://localhost:8787/api/session
-curl -i http://localhost:8787/api/company
-curl -i http://localhost:8787/dashboard
-```
-
-Expected routing shape:
-
-- `/`, `/register`, `/login`, `/auth/callback`, `/logout`, and `/api/*` are Worker-handled.
-- `/auth/callback` must return a Worker response and must not be served by the SPA fallback.
-- `/dashboard` is served by the SPA fallback.
-- Without local Auth0 settings, `/register` and `/login` may fail clearly with an Auth0 configuration error instead of redirecting.
-- Without an authenticated local session, `/api/session` returns unauthenticated and `/api/company` returns unauthenticated. The local PUT request above should return `401 Unauthorized`, not `403 Forbidden` for Origin.
-
-## Production Smoke Test
-
-1. Visit `https://dashboard.rslcollective.org/`.
-2. Confirm unauthenticated access redirects to `/login`.
-3. Complete Auth0 Universal Login or registration.
-4. Confirm the callback returns through `/auth/callback` and lands on `/dashboard`.
-5. Confirm a new user lands on Company Profile.
-6. Create a company profile.
-7. Refresh and confirm the profile persists.
-8. Sign out.
-9. Confirm the local session is cleared and the browser redirects through Auth0 logout to `/login`.
-10. Log in again.
-11. Confirm the company profile loads.
-
-## Pre-Deploy Checklist
-
-- `pnpm check` passes.
-- `pnpm build` passes.
-- `pnpm test` passes.
-- `pnpm exec wrangler whoami` shows the intended Cloudflare account.
-- `wrangler.production.jsonc` `account_id` is the Cloudflare account that controls `rslcollective.org`.
-- Any placeholder account, D1, or Auth0 IDs in Wrangler configs have been replaced before deploy.
-- D1 `database_id` belongs to the same Cloudflare account.
-- Remote D1 migration is applied.
-- Worker secrets and production runtime variables are set.
-- Auth0 callback URL is allow-listed.
-- Auth0 logout return URL is allow-listed.
-- Auth0 custom domain `login.rslcollective.org` is verified with DNS-only CNAME while validating Auth0-managed certificates.
-- `dashboard.rslcollective.org` route is active.
-- `/auth/callback` is tested as Worker-handled.
+1. Visit `https://dashboard.rslcollective.org/login`.
+2. Sign up with email and complete verification.
+3. Confirm redirect to `/dashboard`.
+4. Confirm `/api/session` is authenticated.
+5. Create a publisher profile.
+6. Sign out and confirm return to `/login`.
+7. Sign in again with email.
+8. Test Google sign-in.
+9. Test Microsoft sign-in.
+10. Confirm unauthenticated API requests return `401`.

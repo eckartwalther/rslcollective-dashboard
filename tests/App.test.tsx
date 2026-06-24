@@ -1,26 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import html from "../index.html?raw";
 import { App } from "../src/app/App";
+import { setClerkAuthState } from "./setup";
 
 describe("App scaffold", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the unauthenticated dashboard state", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(
-        new Response(JSON.stringify({ authenticated: false }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        })
-      )
-    );
+  it("renders the signed-out login route instead of a dashboard interstitial", async () => {
+    setClerkAuthState({ isSignedIn: false });
+    window.history.pushState(null, "", "/");
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: /sign in required/i })).toBeInTheDocument();
+    expect(await screen.findByTestId("clerk-sign-in")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /sign in required/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/publisher@example.com/i)).not.toBeInTheDocument();
   });
 

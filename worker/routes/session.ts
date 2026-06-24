@@ -1,51 +1,45 @@
 import { Hono } from "hono";
 import {
-  getUserById as getUserByIdInDb,
   type UserRow
 } from "../lib/db";
 import {
-  createD1SessionStore,
-  validateSessionFromRequest,
-  type SessionEnv,
-  type SessionStore
-} from "../lib/session";
+  authenticateClerkRequest,
+  defaultClerkAuthDeps,
+  type ClerkAuthDeps,
+  type ClerkEnv
+} from "../lib/clerk";
 
-type Bindings = SessionEnv & {
+type Bindings = ClerkEnv & {
   DB: D1Database;
 };
 
 export type SessionRouteDeps = {
-  createSessionStore: (db: D1Database) => SessionStore;
-  getUserById: (db: D1Database, userId: string) => Promise<UserRow | null>;
+  clerkAuth: ClerkAuthDeps;
 };
 
 const defaultDeps: SessionRouteDeps = {
-  createSessionStore: createD1SessionStore,
-  getUserById: getUserByIdInDb
+  clerkAuth: defaultClerkAuthDeps
 };
 
 export function createSessionRoutes(deps: SessionRouteDeps = defaultDeps) {
   const routes = new Hono<{ Bindings: Bindings }>();
 
   routes.get("/", async (c) => {
-    const store = deps.createSessionStore(c.env.DB);
-    const result = await validateSessionFromRequest(store, c.req.raw, c.env);
+    const result = await authenticateClerkRequest(
+      c.env.DB,
+      c.req.raw,
+      c.env,
+      { syncUser: true },
+      deps.clerkAuth
+    );
 
-    if (!result.authenticated) {
+    if (!result) {
       return c.json({ authenticated: false });
     }
-
-    const user = await deps.getUserById(c.env.DB, result.session.user_id);
-
-    if (!user) {
-      return c.json({ authenticated: false });
-    }
-
-    c.header("Set-Cookie", result.cookie);
 
     return c.json({
       authenticated: true,
-      user: mapSessionUser(user)
+      user: mapSessionUser(result.user)
     });
   });
 

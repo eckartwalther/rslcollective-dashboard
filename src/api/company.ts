@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/react";
 import { ApiError, apiJson, apiRequest, readJsonBody } from "./client";
 import { sessionQueryKey } from "./session";
 
@@ -51,11 +52,14 @@ export type SaveCompanyResult = CompanyResponse & {
   created: boolean;
 };
 
-export function getCompany() {
-  return apiJson<CompanyResponse>("/api/company");
+export function getCompany(authToken?: string | null) {
+  return apiJson<CompanyResponse>("/api/company", {}, authToken);
 }
 
-export async function saveCompany(input: Record<string, unknown>): Promise<SaveCompanyResult> {
+export async function saveCompany(
+  input: Record<string, unknown>,
+  authToken?: string | null
+): Promise<SaveCompanyResult> {
   const response = await apiRequest("/api/company", {
     method: "PUT",
     headers: {
@@ -63,7 +67,7 @@ export async function saveCompany(input: Record<string, unknown>): Promise<SaveC
       "Content-Type": "application/json"
     },
     body: JSON.stringify(pickCompanyProfilePayload(input))
-  });
+  }, authToken);
   const body = await readJsonBody(response);
 
   if (!response.ok) {
@@ -77,18 +81,21 @@ export async function saveCompany(input: Record<string, unknown>): Promise<SaveC
 }
 
 export function useCompanyQuery(authenticated: boolean) {
+  const { getToken } = useAuth();
+
   return useQuery({
     queryKey: companyQueryKey,
-    queryFn: getCompany,
+    queryFn: async () => getCompany(await getToken()),
     enabled: authenticated
   });
 }
 
 export function useSaveCompanyMutation() {
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
 
   return useMutation({
-    mutationFn: saveCompany,
+    mutationFn: async (input: Record<string, unknown>) => saveCompany(input, await getToken()),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: companyQueryKey });
 

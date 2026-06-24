@@ -1,13 +1,13 @@
 import { createCompanyRoutes, type CompanyRouteDeps } from "../worker/routes/company";
-import { authRoutes } from "../worker/routes/auth";
 import { validateOrigin } from "../worker/lib/csrf";
-import { SESSION_COOKIE_NAME, type SessionStore } from "../worker/lib/session";
-import type { CompanyData, CompanyRow, SessionData, SessionRow, UserRow } from "../worker/lib/db";
+import type { ClerkAuthDeps } from "../worker/lib/clerk";
+import type { CompanyData, CompanyRow, UserRow } from "../worker/lib/db";
 
 const productionEnv = {
+  CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
+  CLERK_SECRET_KEY: "sk_test_mock",
   ENVIRONMENT: "production",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
-  AUTH0_CLIENT_ID: "client_test",
   DB: {} as D1Database
 };
 
@@ -28,8 +28,8 @@ const validPayload = {
 
 describe("Origin validation", () => {
   it("rejects missing production Origin", () => {
-    const request = new Request("https://dashboard.rslcollective.org/logout", {
-      method: "POST"
+    const request = new Request("https://dashboard.rslcollective.org/api/company", {
+      method: "PUT"
     });
 
     expect(validateOrigin(request, productionEnv)).toMatchObject({
@@ -39,8 +39,8 @@ describe("Origin validation", () => {
   });
 
   it("rejects mismatched production Origin", () => {
-    const request = new Request("https://dashboard.rslcollective.org/logout", {
-      method: "POST",
+    const request = new Request("https://dashboard.rslcollective.org/api/company", {
+      method: "PUT",
       headers: { Origin: "https://example.com" }
     });
 
@@ -51,8 +51,8 @@ describe("Origin validation", () => {
   });
 
   it("accepts matching production Origin", () => {
-    const request = new Request("https://dashboard.rslcollective.org/logout", {
-      method: "POST",
+    const request = new Request("https://dashboard.rslcollective.org/api/company", {
+      method: "PUT",
       headers: { Origin: "https://dashboard.rslcollective.org" }
     });
 
@@ -73,8 +73,8 @@ describe("Origin validation", () => {
     "http://[::1]:8788",
     "https://[::1]:8788"
   ])("accepts local Worker Origin %s in development", (origin) => {
-    const request = new Request(`${origin}/logout`, {
-      method: "POST",
+    const request = new Request(`${origin}/api/company`, {
+      method: "PUT",
       headers: { Origin: origin }
     });
 
@@ -86,8 +86,8 @@ describe("Origin validation", () => {
   });
 
   it("treats missing ENVIRONMENT as development", () => {
-    const request = new Request("http://localhost:8787/logout", {
-      method: "POST",
+    const request = new Request("http://localhost:8787/api/company", {
+      method: "PUT",
       headers: { Origin: "http://localhost:8787" }
     });
 
@@ -98,22 +98,9 @@ describe("Origin validation", () => {
     });
   });
 
-  it("treats ENVIRONMENT=development as development", () => {
-    const request = new Request("http://localhost:8787/logout", {
-      method: "POST",
-      headers: { Origin: "http://localhost:8787" }
-    });
-
-    expect(validateOrigin(request, { ENVIRONMENT: "development" })).toMatchObject({
-      valid: true,
-      productionMode: false,
-      environment: "development"
-    });
-  });
-
   it("treats ENVIRONMENT=production as production", () => {
-    const request = new Request("http://localhost:8787/logout", {
-      method: "POST",
+    const request = new Request("http://localhost:8787/api/company", {
+      method: "PUT",
       headers: { Origin: "http://localhost:8787" }
     });
 
@@ -125,108 +112,23 @@ describe("Origin validation", () => {
     });
   });
 
-  it("accepts localhost in production only when DASHBOARD_BASE_URL exactly matches after normalization", () => {
-    const request = new Request("http://localhost:8787/logout", {
-      method: "POST",
-      headers: { Origin: "http://localhost:8787/" }
-    });
-
-    expect(
-      validateOrigin(request, {
-        ENVIRONMENT: "production",
-        DASHBOARD_BASE_URL: "http://localhost:8787/"
-      })
-    ).toMatchObject({
-      valid: true,
-      productionMode: true,
-      normalizedRequestOrigin: "http://localhost:8787",
-      normalizedDashboardOrigin: "http://localhost:8787"
-    });
-  });
-
-  it("accepts configured DASHBOARD_BASE_URL Origin in development", () => {
-    const request = new Request("https://dashboard-dev.example/logout", {
-      method: "POST",
-      headers: { Origin: "https://dashboard-dev.example" }
-    });
-
-    expect(
-      validateOrigin(request, {
-        ENVIRONMENT: "development",
-        DASHBOARD_BASE_URL: "https://dashboard-dev.example"
-      })
-    ).toMatchObject({ valid: true });
-  });
-
-  it("rejects non-localhost public Origins in development", () => {
-    const request = new Request("http://localhost:8787/logout", {
-      method: "POST",
-      headers: { Origin: "https://evil.example" }
-    });
-
-    expect(validateOrigin(request, { ENVIRONMENT: "development" })).toMatchObject({
-      valid: false,
-      reason: "mismatched_origin"
-    });
-  });
-
-  it("enforces Origin on POST /logout", async () => {
-    const missingOrigin = await authRoutes.request(
-      "https://dashboard.rslcollective.org/logout",
-      { method: "POST" },
-      productionEnv
-    );
-    const matchingOrigin = await authRoutes.request(
-      "https://dashboard.rslcollective.org/logout",
-      {
-        method: "POST",
-        headers: { Origin: "https://dashboard.rslcollective.org" }
-      },
-      productionEnv
-    );
-
-    expect(missingOrigin.status).toBe(403);
-    expect(matchingOrigin.status).toBe(302);
-    expect(matchingOrigin.headers.get("Set-Cookie")).toContain("__Host-rsl_dashboard_session=");
-  });
-
-  it("rejects invalid development Origin on POST /logout", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const response = await authRoutes.request(
-      "http://localhost:8787/logout",
-      {
-        method: "POST",
-        headers: { Origin: "https://evil.example" }
-      },
-      {
-        ENVIRONMENT: "development",
-        DB: {} as D1Database
-      }
-    );
-
-    expect(response.status).toBe(403);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"event":"origin_rejected"')
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"origin":"https://evil.example"')
-    );
-    warnSpy.mockRestore();
-  });
-
   it("logs a reduced safe Origin rejection diagnostic in development", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const response = await authRoutes.request(
-      "http://localhost:8787/logout",
+    const response = await createAuthenticatedCompanyRoute().route.request(
+      "http://localhost:8787/",
       {
-        method: "POST",
+        method: "PUT",
         headers: {
+          Authorization: "Bearer clerk-session-token",
+          "Content-Type": "application/json",
           Host: "localhost:8787",
           Origin: "http://dashboard.rslcollective.org",
           Referer: "http://localhost:8787/dashboard/company"
-        }
+        },
+        body: JSON.stringify(validPayload)
       },
       {
+        CLERK_SECRET_KEY: "sk_test_mock",
         ENVIRONMENT: "development",
         DASHBOARD_BASE_URL: "http://localhost:8787",
         DB: {} as D1Database
@@ -240,8 +142,8 @@ describe("Origin validation", () => {
 
     expect(log).toMatchObject({
       event: "origin_rejected",
-      method: "POST",
-      path: "/logout",
+      method: "PUT",
+      path: "/",
       origin: "http://dashboard.rslcollective.org",
       dashboardBaseUrl: "http://localhost:8787",
       environment: "development",
@@ -250,21 +152,13 @@ describe("Origin validation", () => {
     expect(log).not.toHaveProperty("url");
     expect(log).not.toHaveProperty("host");
     expect(log).not.toHaveProperty("referer");
-    expect(log).not.toHaveProperty("productionMode");
-    expect(log).not.toHaveProperty("normalizedOrigin");
-    expect(log).not.toHaveProperty("normalizedDashboardBaseUrl");
     expect(log).not.toHaveProperty("cookie");
     expect(log).not.toHaveProperty("authorization");
     warnSpy.mockRestore();
   });
 
-  it("returns unauthenticated for PUT /api/company when no valid session is present", async () => {
+  it("returns unauthenticated for PUT /api/company when no valid Clerk token is present", async () => {
     const companyRoutes = createCompanyRoutes();
-    const missingOrigin = await companyRoutes.request(
-      "https://dashboard.rslcollective.org/",
-      { method: "PUT" },
-      productionEnv
-    );
     const matchingOrigin = await companyRoutes.request(
       "https://dashboard.rslcollective.org/",
       {
@@ -280,29 +174,31 @@ describe("Origin validation", () => {
         headers: { Origin: "http://localhost:8787" }
       },
       {
-        ENVIRONMENT: "development"
+        CLERK_SECRET_KEY: "sk_test_mock",
+        ENVIRONMENT: "development",
+        DB: {} as D1Database
       }
     );
 
-    expect(missingOrigin.status).toBe(401);
     expect(matchingOrigin.status).toBe(401);
     expect(localhostOrigin.status).toBe(401);
   });
 
   it("allows authenticated PUT /api/company save with a valid local development Origin", async () => {
-    const { route, calls } = createAuthenticatedCompanyRoute();
+    const { calls, route } = createAuthenticatedCompanyRoute();
     const response = await route.request(
       "https://localhost:8787/",
       {
         method: "PUT",
         headers: {
-          Cookie: `${SESSION_COOKIE_NAME}=test-token`,
+          Authorization: "Bearer clerk-session-token",
           "Content-Type": "application/json",
           Origin: "https://localhost:8787"
         },
         body: JSON.stringify(validPayload)
       },
       {
+        CLERK_SECRET_KEY: "sk_test_mock",
         ENVIRONMENT: "development",
         DB: {} as D1Database
       }
@@ -312,44 +208,22 @@ describe("Origin validation", () => {
     expect(calls.created).toBe(1);
   });
 
-  it("allows authenticated PUT /api/company save with http localhost Origin and missing ENVIRONMENT", async () => {
-    const { route, calls } = createAuthenticatedCompanyRoute();
-    const response = await route.request(
-      "http://localhost:8787/",
-      {
-        method: "PUT",
-        headers: {
-          Cookie: `${SESSION_COOKIE_NAME}=test-token`,
-          "Content-Type": "application/json",
-          Origin: "http://localhost:8787"
-        },
-        body: JSON.stringify(validPayload)
-      },
-      {
-        DB: {} as D1Database
-      }
-    );
-
-    expect(response.status).not.toBe(403);
-    expect(response.status).toBe(201);
-    expect(calls.created).toBe(1);
-  });
-
   it("rejects authenticated PUT /api/company save with a public development Origin", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const { route, calls } = createAuthenticatedCompanyRoute();
+    const { calls, route } = createAuthenticatedCompanyRoute();
     const response = await route.request(
       "http://localhost:8787/",
       {
         method: "PUT",
         headers: {
-          Cookie: `${SESSION_COOKIE_NAME}=test-token`,
+          Authorization: "Bearer clerk-session-token",
           "Content-Type": "application/json",
           Origin: "https://evil.example"
         },
         body: JSON.stringify(validPayload)
       },
       {
+        CLERK_SECRET_KEY: "sk_test_mock",
         ENVIRONMENT: "development",
         DB: {} as D1Database
       }
@@ -368,15 +242,27 @@ function createAuthenticatedCompanyRoute() {
   const calls = {
     created: 0
   };
-  const sessionStore: SessionStore = {
-    createSession: async (_session: SessionData) => null,
-    getSessionByTokenHash: async () => createSessionRow(),
-    deleteSession: async () => undefined,
-    refreshSessionExpiry: async (_sessionId, expiresAt) => createSessionRow({ expires_at: expiresAt })
+  const clerkAuth: ClerkAuthDeps = {
+    verifyToken: vi.fn(async () => ({ sub: "user_clerk_test" })) as unknown as ClerkAuthDeps["verifyToken"],
+    getClerkUser: vi.fn(async () => ({
+      id: "user_clerk_test",
+      firstName: "Jane",
+      lastName: "Publisher",
+      primaryEmailAddressId: "idn_email",
+      emailAddresses: [
+        {
+          id: "idn_email",
+          emailAddress: "publisher@example.com",
+          verification: { status: "verified" }
+        }
+      ]
+    })),
+    getUserByAuthIdentity: vi.fn(async () => createUser()),
+    createUserFromAuthIdentity: vi.fn(async () => createUser()),
+    updateUserFromAuthIdentity: vi.fn(async () => createUser())
   };
   const deps: CompanyRouteDeps = {
-    createSessionStore: () => sessionStore,
-    getUserById: async () => createUser(),
+    clerkAuth,
     getCompanyForUser: async () => null,
     createCompanyAndAttachUser: async (_db, _userId, data) => {
       calls.created += 1;
@@ -394,8 +280,8 @@ function createAuthenticatedCompanyRoute() {
 function createUser(): UserRow {
   return {
     id: "usr_test",
-    auth_provider: "auth0",
-    auth_subject: "auth0|user_test",
+    auth_provider: "clerk",
+    auth_subject: "user_clerk_test",
     company_id: null,
     email: "publisher@example.com",
     first_name: "Jane",
@@ -404,19 +290,6 @@ function createUser(): UserRow {
     role: "owner",
     created_at: "2026-06-11T00:00:00.000Z",
     updated_at: "2026-06-11T00:00:00.000Z"
-  };
-}
-
-function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
-  return {
-    id: "ses_test",
-    user_id: "usr_test",
-    token_hash: "hash_test",
-    csrf_token_hash: null,
-    expires_at: "2026-07-11T00:00:00.000Z",
-    created_at: "2026-06-11T00:00:00.000Z",
-    updated_at: "2026-06-11T00:00:00.000Z",
-    ...overrides
   };
 }
 

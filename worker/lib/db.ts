@@ -35,16 +35,6 @@ export type CompanyRow = {
   updated_at: string;
 };
 
-export type SessionRow = {
-  id: string;
-  user_id: string;
-  token_hash: string;
-  csrf_token_hash: string | null;
-  expires_at: string;
-  created_at: string;
-  updated_at: string;
-};
-
 export type AuthenticatedUserData = {
   authProvider: string;
   authSubject: string;
@@ -68,13 +58,6 @@ export type CompanyData = {
   addressLine1?: string | null;
   addressLine2?: string | null;
   description?: string | null;
-};
-
-export type SessionData = {
-  userId: string;
-  tokenHash: string;
-  csrfTokenHash?: string | null;
-  expiresAt: string;
 };
 
 type CreateOptions = {
@@ -330,66 +313,4 @@ export async function updateCompanyForUser(
     .run();
 
   return getCompanyForUser(db, userId);
-}
-
-export async function createSession(
-  db: D1Database,
-  session: SessionData,
-  options: CreateOptions = {}
-) {
-  const id = options.id ?? createId("ses");
-  const timestamp = options.timestamp ?? nowIso();
-
-  await db
-    .prepare(
-      `INSERT INTO sessions (
-        id,
-        user_id,
-        token_hash,
-        csrf_token_hash,
-        expires_at,
-        created_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      id,
-      session.userId,
-      session.tokenHash,
-      nullable(session.csrfTokenHash),
-      session.expiresAt,
-      timestamp,
-      timestamp
-    )
-    .run();
-
-  return getSessionByTokenHash(db, session.tokenHash);
-}
-
-export function getSessionByTokenHash(db: D1Database, tokenHash: string) {
-  return db
-    .prepare("SELECT * FROM sessions WHERE token_hash = ?")
-    .bind(tokenHash)
-    .first<SessionRow>();
-}
-
-export function deleteSession(db: D1Database, sessionId: string) {
-  return db.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
-}
-
-export async function refreshSessionExpiry(
-  db: D1Database,
-  sessionId: string,
-  expiresAt: string
-) {
-  await db
-    .prepare("UPDATE sessions SET expires_at = ?, updated_at = ? WHERE id = ?")
-    .bind(expiresAt, nowIso(), sessionId)
-    .run();
-
-  return getSessionById(db, sessionId);
-}
-
-function getSessionById(db: D1Database, sessionId: string) {
-  return db.prepare("SELECT * FROM sessions WHERE id = ?").bind(sessionId).first<SessionRow>();
 }

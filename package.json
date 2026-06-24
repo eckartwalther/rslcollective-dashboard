@@ -14,11 +14,12 @@
     "db:migrate:remote": "wrangler d1 migrations apply rsl-collective-dashboard --remote --config wrangler.production.jsonc"
   },
   "dependencies": {
+    "@clerk/backend": "^3.8.3",
+    "@clerk/react": "^6.11.0",
     "@mantine/core": "^8.0.0",
     "@mantine/hooks": "^8.0.0",
     "@tanstack/react-query": "^5.0.0",
     "hono": "^4.0.0",
-    "jose": "^6.1.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

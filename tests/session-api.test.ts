@@ -1,40 +1,19 @@
 import { createSessionRoutes, type SessionRouteDeps } from "../worker/routes/session";
-import {
-  DEVELOPMENT_SESSION_COOKIE_NAME,
-  SESSION_COOKIE_NAME,
-  hashSessionToken,
-  type SessionStore
-} from "../worker/lib/session";
-import type { SessionData, SessionRow, UserRow } from "../worker/lib/db";
+import type { ClerkAuthDeps, ClerkBackendUser } from "../worker/lib/clerk";
+import type { AuthenticatedUserData, UserRow } from "../worker/lib/db";
 
 const env = {
+  CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
+  CLERK_SECRET_KEY: "sk_test_mock",
   ENVIRONMENT: "production",
   DB: {} as D1Database
 };
 
-const developmentEnv = {
-  ENVIRONMENT: "development",
-  DB: {} as D1Database
-};
-
-function createSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
-  return {
-    id: "ses_test",
-    user_id: "usr_test",
-    token_hash: "hash_test",
-    csrf_token_hash: null,
-    expires_at: "2026-07-11T00:00:00.000Z",
-    created_at: "2026-06-11T00:00:00.000Z",
-    updated_at: "2026-06-11T00:00:00.000Z",
-    ...overrides
-  };
-}
-
 function createUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
     id: "usr_test",
-    auth_provider: "auth0",
-    auth_subject: "auth0|user_test",
+    auth_provider: "clerk",
+    auth_subject: "user_clerk_test",
     company_id: "cmp_test",
     email: "jane@example.com",
     first_name: "Jane",
@@ -47,24 +26,49 @@ function createUser(overrides: Partial<UserRow> = {}): UserRow {
   };
 }
 
-function createHarness(options: { session?: SessionRow | null; user?: UserRow | null } = {}) {
-  let session = options.session ?? null;
-  const sessionStore: SessionStore = {
-    createSession: async (_session: SessionData) => null,
-    getSessionByTokenHash: async (tokenHash) =>
-      session?.token_hash === tokenHash ? session : null,
-    deleteSession: async () => undefined,
-    refreshSessionExpiry: async (_sessionId, expiresAt) => {
-      session = session ? { ...session, expires_at: expiresAt } : null;
-      return session;
-    }
+function createClerkUser(overrides: Partial<ClerkBackendUser> = {}): ClerkBackendUser {
+  return {
+    id: "user_clerk_test",
+    firstName: "Jane",
+    lastName: "Publisher",
+    primaryEmailAddressId: "idn_email",
+    emailAddresses: [
+      {
+        id: "idn_email",
+        emailAddress: "jane@example.com",
+        verification: { status: "verified" }
+      }
+    ],
+    ...overrides
   };
-  const deps: SessionRouteDeps = {
-    createSessionStore: () => sessionStore,
-    getUserById: async () => options.user ?? null
-  };
+}
 
-  return createSessionRoutes(deps);
+function createHarness(options: { user?: UserRow | null; tokenSub?: string | null } = {}) {
+  const user = options.user ?? createUser();
+  const calls = {
+    createdUser: null as AuthenticatedUserData | null,
+    updatedUser: null as AuthenticatedUserData | null
+  };
+  const clerkAuth: ClerkAuthDeps = {
+    verifyToken: vi.fn(async () => ({ sub: options.tokenSub ?? "user_clerk_test" })) as unknown as ClerkAuthDeps["verifyToken"],
+    getClerkUser: vi.fn(async () => createClerkUser()),
+    getUserByAuthIdentity: vi.fn(async () => options.user ?? null),
+    createUserFromAuthIdentity: vi.fn(async (_db, data) => {
+      calls.createdUser = data;
+      return user;
+    }),
+    updateUserFromAuthIdentity: vi.fn(async (_db, data) => {
+      calls.updatedUser = data;
+      return user;
+    })
+  };
+  const deps: SessionRouteDeps = { clerkAuth };
+
+  return {
+    calls,
+    clerkAuth,
+    route: createSessionRoutes(deps)
+  };
 }
 
 async function readJson(response: Response) {
@@ -72,24 +76,19 @@ async function readJson(response: Response) {
 }
 
 describe("GET /api/session", () => {
-  it("returns unauthenticated without a valid session cookie", async () => {
-    const route = createHarness();
+  it("returns unauthenticated without a Clerk bearer token", async () => {
+    const { route } = createHarness();
     const response = await route.request("/", {}, env);
 
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({ authenticated: false });
   });
 
-  it("returns authenticated user shape for a valid session", async () => {
-    const token = "valid-session-token";
-    const tokenHash = await hashSessionToken(token);
-    const route = createHarness({
-      session: createSessionRow({ token_hash: tokenHash }),
-      user: createUser()
-    });
+  it("provisions a local D1 user from the verified Clerk user", async () => {
+    const { calls, route } = createHarness({ user: null });
     const response = await route.request(
       "/",
-      { headers: { Cookie: `${SESSION_COOKIE_NAME}=${token}` } },
+      { headers: { Authorization: "Bearer clerk-session-token" } },
       env
     );
 
@@ -104,86 +103,57 @@ describe("GET /api/session", () => {
         hasCompany: true
       }
     });
-  });
-
-  it("returns authenticated user shape for a valid development session cookie", async () => {
-    const token = "valid-development-session-token";
-    const tokenHash = await hashSessionToken(token);
-    const route = createHarness({
-      session: createSessionRow({ token_hash: tokenHash }),
-      user: createUser()
-    });
-    const response = await route.request(
-      "/",
-      { headers: { Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}` } },
-      developmentEnv
-    );
-
-    expect(response.status).toBe(200);
-    expect(await readJson(response)).toMatchObject({
-      authenticated: true,
-      user: {
-        email: "jane@example.com"
-      }
+    expect(calls.createdUser).toMatchObject({
+      authProvider: "clerk",
+      authSubject: "user_clerk_test",
+      email: "jane@example.com",
+      emailVerified: true
     });
   });
 
-  it("does not authenticate a development cookie in production", async () => {
-    const token = "dev-cookie-only-token";
-    const tokenHash = await hashSessionToken(token);
-    const route = createHarness({
-      session: createSessionRow({ token_hash: tokenHash }),
-      user: createUser()
-    });
+  it("updates an existing local user when /api/session is read", async () => {
+    const { calls, route } = createHarness({ user: createUser() });
     const response = await route.request(
       "/",
-      { headers: { Cookie: `${DEVELOPMENT_SESSION_COOKIE_NAME}=${token}` } },
+      { headers: { Authorization: "Bearer clerk-session-token" } },
       env
     );
 
     expect(response.status).toBe(200);
-    expect(await readJson(response)).toEqual({ authenticated: false });
+    expect(calls.createdUser).toBeNull();
+    expect(calls.updatedUser).toMatchObject({
+      authProvider: "clerk",
+      authSubject: "user_clerk_test",
+      email: "jane@example.com"
+    });
   });
 
-  it("does not authenticate expired sessions", async () => {
-    const token = "expired-session-token";
-    const tokenHash = await hashSessionToken(token);
-    const route = createHarness({
-      session: createSessionRow({
-        token_hash: tokenHash,
-        expires_at: "2000-01-01T00:00:00.000Z"
-      }),
-      user: createUser()
-    });
+  it("does not expose provider IDs or Clerk token claims", async () => {
+    const { route } = createHarness({ user: null });
     const response = await route.request(
       "/",
-      { headers: { Cookie: `${SESSION_COOKIE_NAME}=${token}` } },
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(await readJson(response)).toEqual({ authenticated: false });
-  });
-
-  it("does not expose provider IDs, session IDs, or token hashes", async () => {
-    const token = "safe-response-token";
-    const tokenHash = await hashSessionToken(token);
-    const route = createHarness({
-      session: createSessionRow({ token_hash: tokenHash }),
-      user: createUser()
-    });
-    const response = await route.request(
-      "/",
-      { headers: { Cookie: `${SESSION_COOKIE_NAME}=${token}` } },
+      { headers: { Authorization: "Bearer safe-response-token" } },
       env
     );
     const body = JSON.stringify(await readJson(response));
 
-    expect(body).not.toContain("auth0|");
+    expect(body).not.toContain("user_clerk_test");
     expect(body).not.toContain("auth_subject");
     expect(body).not.toContain("auth_provider");
-    expect(body).not.toContain("ses_test");
-    expect(body).not.toContain(tokenHash);
-    expect(body).not.toContain("token_hash");
+    expect(body).not.toContain("safe-response-token");
+  });
+
+  it("returns unauthenticated when Clerk token verification fails", async () => {
+    const { clerkAuth, route } = createHarness();
+    vi.mocked(clerkAuth.verifyToken).mockRejectedValueOnce(new Error("bad token"));
+
+    const response = await route.request(
+      "/",
+      { headers: { Authorization: "Bearer invalid-token" } },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({ authenticated: false });
   });
 });

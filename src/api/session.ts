@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/react";
 import { useQuery } from "@tanstack/react-query";
 import { apiJson } from "./client";
 
@@ -18,24 +19,23 @@ export type SessionResponse =
       user: SessionUser;
     };
 
-export function getSession() {
-  return apiJson<SessionResponse>("/api/session");
+export function getSession(authToken?: string | null) {
+  return apiJson<SessionResponse>("/api/session", {}, authToken);
 }
 
 export function useSessionQuery() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+
   return useQuery({
     queryKey: sessionQueryKey,
-    queryFn: getSession,
+    queryFn: async () => {
+      if (!isSignedIn) {
+        return { authenticated: false } satisfies SessionResponse;
+      }
+
+      return getSession(await getToken());
+    },
+    enabled: isLoaded,
     staleTime: 30_000
   });
-}
-
-export function signOut() {
-  const form = document.createElement("form");
-
-  form.method = "POST";
-  form.action = "/logout";
-  form.style.display = "none";
-  document.body.appendChild(form);
-  form.submit();
 }

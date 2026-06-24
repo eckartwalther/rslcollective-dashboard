@@ -1,13 +1,13 @@
 # RSL Collective Dashboard
 
-Authenticated profile dashboard for RSL Collective publishers. The app is a Vite React SPA served by a Cloudflare Worker, with Hono API/auth routes and D1-backed local sessions.
+Authenticated profile dashboard for RSL Collective publishers. The app is a Vite React SPA served by a Cloudflare Worker, with Clerk-native browser sessions, Hono API routes, and D1-backed user/company records.
 
 ## Stack
 
 - React 19, React Router DOM v7, TanStack React Query v5, Mantine v8
 - Vite, TypeScript, Vitest, Testing Library, jsdom
 - Cloudflare Workers, Workers Assets, Wrangler, Hono, D1
-- Auth0 Universal Login with a Regular Web Application OIDC client
+- Clerk React components with Worker-side Clerk session-token verification
 
 ## Commands
 
@@ -38,6 +38,6 @@ Production deploy uses `wrangler.production.jsonc`, which contains the `dashboar
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for Cloudflare account targeting, D1 setup, Worker secrets, Auth0 configuration, and the production smoke test.
+See [docs/deployment.md](docs/deployment.md) for Cloudflare account targeting, D1 setup, Worker secrets, Clerk configuration, and the production smoke test.
 
 Use [docs/production-checklist.md](docs/production-checklist.md) for the final production setup sequence before running remote migrations or deploying.

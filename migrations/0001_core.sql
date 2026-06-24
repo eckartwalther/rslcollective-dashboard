@@ -35,17 +35,3 @@ CREATE TABLE users (
 
 CREATE UNIQUE INDEX idx_users_auth_identity ON users(auth_provider, auth_subject);
 CREATE INDEX idx_users_company_id ON users(company_id);
-
-CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  token_hash TEXT NOT NULL UNIQUE,
-  csrf_token_hash TEXT,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);

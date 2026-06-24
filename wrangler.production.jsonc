@@ -5,9 +5,7 @@
 	"account_id": "a1c2ba23b7e8773d87661d35ddca3fe7",
 	"compatibility_date": "2026-06-11",
 	"vars": {
-    "AUTH0_ISSUER_BASE_URL": "https://login.rslcollective.org",
-		"AUTH0_CLIENT_ID": "Rh6L36YoEzjBtpBVTy2w8gqR03WxgdcN",
-		"AUTH0_CALLBACK_URL": "https://dashboard.rslcollective.org/auth/callback",
+		"CLERK_AUTHORIZED_PARTIES": "https://dashboard.rslcollective.org",
 		"DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
 		"ENVIRONMENT": "production"
 	},
@@ -19,7 +17,6 @@
 			"/",
 			"/register",
 			"/login",
-			"/auth/*",
 			"/logout",
 			"/api/*"
 		]

@@ -97,9 +97,14 @@ describe("company API hooks", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/company",
-        expect.objectContaining({ credentials: "include" })
+        expect.objectContaining({
+          credentials: "include",
+          headers: expect.any(Headers)
+        })
       );
     });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-clerk-token");
   });
 
   it("calls GET /api/company from the API client", async () => {
@@ -130,6 +135,7 @@ describe("company API hooks", () => {
       );
     });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-clerk-token");
     expect(new Headers(init.headers).has("Origin")).toBe(false);
   });
 

@@ -117,6 +117,7 @@ describe("dashboard behavior", () => {
     expect(screen.queryByText("RSL Collective")).not.toBeInTheDocument();
     expect(screen.queryByText("Profile application")).not.toBeInTheDocument();
     expect(screen.getAllByText("jane@example.com").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /manage account/i })).not.toBeInTheDocument();
   });
 
   it("does not render placeholder account data", async () => {
@@ -144,11 +145,8 @@ describe("dashboard behavior", () => {
     expect(privacyLink).toHaveAttribute("href", "https://rslcollective.org/legal/privacy");
   });
 
-  it("submits sign-out through a POST /logout form", async () => {
+  it("does not submit sign-out through a local POST /logout form", async () => {
     mockDashboardFetch(authenticatedSession());
-    const submitSpy = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(() => undefined);
 
     renderDashboard();
 
@@ -156,11 +154,7 @@ describe("dashboard behavior", () => {
     fireEvent.click(signOutButtons[0]);
 
     await waitFor(() => {
-      const form = document.querySelector<HTMLFormElement>('form[action="/logout"]');
-
-      expect(form).not.toBeNull();
-      expect(form?.method).toBe("post");
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(document.querySelector<HTMLFormElement>('form[action="/logout"]')).toBeNull();
     });
   });
 
@@ -181,7 +175,7 @@ describe("dashboard behavior", () => {
     await screen.findAllByText("jane@example.com");
     const text = document.body.textContent ?? "";
 
-    expect(text).not.toContain("auth0|");
+    expect(text).not.toContain("user_clerk_test");
     expect(text).not.toContain("ses_test");
     expect(text).not.toContain("token_hash");
   });

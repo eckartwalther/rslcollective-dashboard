@@ -5,7 +5,6 @@ import { requireValidOrigin, type OriginEnv } from "../lib/csrf";
 import {
   createCompanyAndAttachUser as createCompanyAndAttachUserInDb,
   getCompanyForUser as getCompanyForUserInDb,
-  getUserById as getUserByIdInDb,
   updateCompanyForUser as updateCompanyForUserInDb,
   type CompanyData,
   type CompanyRow,
@@ -17,20 +16,19 @@ import {
   validationError
 } from "../lib/responses";
 import {
-  createD1SessionStore,
-  validateSessionFromRequest,
-  type SessionEnv,
-  type SessionStore
-} from "../lib/session";
+  authenticateClerkRequest,
+  defaultClerkAuthDeps,
+  type ClerkAuthDeps,
+  type ClerkEnv
+} from "../lib/clerk";
 
 type Bindings = OriginEnv &
-  SessionEnv & {
+  ClerkEnv & {
     DB: D1Database;
   };
 
 export type CompanyRouteDeps = {
-  createSessionStore: (db: D1Database) => SessionStore;
-  getUserById: (db: D1Database, userId: string) => Promise<UserRow | null>;
+  clerkAuth: ClerkAuthDeps;
   getCompanyForUser: (db: D1Database, userId: string) => Promise<CompanyRow | null>;
   createCompanyAndAttachUser: (
     db: D1Database,
@@ -45,8 +43,7 @@ export type CompanyRouteDeps = {
 };
 
 const defaultDeps: CompanyRouteDeps = {
-  createSessionStore: createD1SessionStore,
-  getUserById: getUserByIdInDb,
+  clerkAuth: defaultClerkAuthDeps,
   getCompanyForUser: getCompanyForUserInDb,
   createCompanyAndAttachUser: createCompanyAndAttachUserInDb,
   updateCompanyForUser: updateCompanyForUserInDb
@@ -123,24 +120,20 @@ async function authenticateCompanyRequest(
   c: Context<{ Bindings: Bindings }>,
   deps: CompanyRouteDeps
 ) {
-  const store = deps.createSessionStore(c.env.DB);
-  const session = await validateSessionFromRequest(store, c.req.raw, c.env);
+  const auth = await authenticateClerkRequest(
+    c.env.DB,
+    c.req.raw,
+    c.env,
+    {},
+    deps.clerkAuth
+  );
 
-  if (!session.authenticated) {
-    return null;
-  }
-
-  c.header("Set-Cookie", session.cookie);
-
-  const user = await deps.getUserById(c.env.DB, session.session.user_id);
-
-  if (!user) {
+  if (!auth) {
     return null;
   }
 
   return {
-    session,
-    user
+    user: auth.user
   };
 }
 

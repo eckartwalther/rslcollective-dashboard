@@ -1,11 +1,14 @@
-import { Button, Center, Container, Loader, Stack, Text, Title } from "@mantine/core";
-import { signOut, useSessionQuery } from "../api/session";
+import { useAuth } from "@clerk/react";
+import { Center, Loader } from "@mantine/core";
+import { Navigate } from "react-router-dom";
+import { useSessionQuery } from "../api/session";
 import { DashboardShell } from "../components/layout/DashboardShell";
 
 export function DashboardPage() {
+  const { isLoaded, isSignedIn, signOut } = useAuth();
   const sessionQuery = useSessionQuery();
 
-  if (sessionQuery.isLoading) {
+  if (!isLoaded || (isSignedIn && sessionQuery.isLoading)) {
     return (
       <Center mih="100vh">
         <Loader aria-label="Loading session" />
@@ -13,24 +16,16 @@ export function DashboardPage() {
     );
   }
 
-  if (!sessionQuery.data?.authenticated) {
-    return (
-      <Container size="sm" py="xl">
-        <Stack gap="md">
-          <Title order={1}>Sign in required</Title>
-          <Text c="dimmed">Please sign in to access the RSL Collective dashboard.</Text>
-          <Button component="a" href="/login" w="fit-content">
-            Sign in
-          </Button>
-        </Stack>
-      </Container>
-    );
+  if (!isSignedIn || !sessionQuery.data?.authenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return (
     <DashboardShell
       user={sessionQuery.data.user}
-      onSignOut={signOut}
+      onSignOut={() => {
+        void signOut({ redirectUrl: "/login" });
+      }}
     />
   );
 }

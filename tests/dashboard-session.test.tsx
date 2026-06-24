@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { AppProviders } from "../src/app/providers";
 import { DashboardPage } from "../src/pages/DashboardPage";
+import { LoginPage } from "../src/pages/LoginPage";
 import type { SessionResponse } from "../src/api/session";
+import { setClerkAuthState } from "./setup";
 
 type AuthenticatedSession = Extract<SessionResponse, { authenticated: true }>;
 
@@ -32,6 +35,26 @@ function renderDashboard() {
       <DashboardPage />
     </AppProviders>
   );
+}
+
+function renderDashboardRoute() {
+  const router = createMemoryRouter(
+    [
+      { path: "/dashboard/*", element: <DashboardPage /> },
+      { path: "/login/*", element: <LoginPage /> }
+    ],
+    {
+      initialEntries: ["/dashboard"]
+    }
+  );
+
+  render(
+    <AppProviders>
+      <RouterProvider router={router} />
+    </AppProviders>
+  );
+
+  return router;
 }
 
 function mockDashboardFetch(session: SessionResponse, company: unknown = { company: null }) {
@@ -74,13 +97,12 @@ describe("dashboard session wiring", () => {
     expect(screen.queryByText("publisher@example.com")).not.toBeInTheDocument();
   });
 
-  it("shows the intended sign-in state when unauthenticated", async () => {
-    mockDashboardFetch({ authenticated: false });
+  it("redirects to Clerk sign-in when unauthenticated", async () => {
+    setClerkAuthState({ isSignedIn: false });
+    const router = renderDashboardRoute();
 
-    renderDashboard();
-
-    expect(await screen.findByRole("heading", { name: /sign in required/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /sign in/i })).toHaveAttribute("href", "/login");
+    expect(await screen.findByTestId("clerk-sign-in")).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
   });
 
   it("displays account name, role, and company state", async () => {
@@ -95,11 +117,8 @@ describe("dashboard session wiring", () => {
     expect(screen.getByText("Exists")).toBeInTheDocument();
   });
 
-  it("submits POST /logout from the sign-out button", async () => {
+  it("signs out through Clerk from the sign-out button", async () => {
     mockDashboardFetch(authenticatedSession());
-    const submitSpy = vi
-      .spyOn(HTMLFormElement.prototype, "submit")
-      .mockImplementation(() => undefined);
 
     renderDashboard();
 
@@ -107,13 +126,7 @@ describe("dashboard session wiring", () => {
     fireEvent.click(buttons[0]);
 
     await waitFor(() => {
-      const form = document.querySelector<HTMLFormElement>('form[action="/logout"]');
-
-      expect(form).not.toBeNull();
-      expect(form?.getAttribute("action")).toBe("/logout");
-      expect(form?.getAttribute("action")).not.toContain("dashboard.rslcollective.org");
-      expect(form?.method).toBe("post");
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(document.querySelector<HTMLFormElement>('form[action="/logout"]')).toBeNull();
     });
   });
 });

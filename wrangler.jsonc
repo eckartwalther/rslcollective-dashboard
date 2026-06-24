@@ -12,7 +12,6 @@
       "/",
       "/register",
       "/login",
-      "/auth/*",
       "/logout",
       "/api/*"
     ]

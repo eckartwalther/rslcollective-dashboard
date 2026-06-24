@@ -6,7 +6,6 @@ import { Miniflare } from "miniflare";
 import coreMigration from "../migrations/0001_core.sql?raw";
 import {
   createCompanyAndAttachUser,
-  createSession,
   getCompanyForUser,
   getUserById,
   type CompanyData,
@@ -127,11 +126,11 @@ async function insertUser(db: D1Database, id: string, companyId: string | null =
         role,
         created_at,
         updated_at
-      ) VALUES (?, 'auth0', ?, ?, ?, ?, ?, 1, 'owner', ?, ?)`
+      ) VALUES (?, 'clerk', ?, ?, ?, ?, ?, 1, 'owner', ?, ?)`
     )
     .bind(
       id,
-      `auth0|${id}`,
+      `user_clerk_${id}`,
       companyId,
       `${id}@example.com`,
       "Test",
@@ -170,12 +169,10 @@ describe("database helper utilities", () => {
   it("generates prefixed opaque IDs", () => {
     const userId = createId("usr");
     const companyId = createId("cmp");
-    const sessionId = createId("ses");
 
     expect(userId).toMatch(/^usr_[0-9a-f]{32}$/);
     expect(companyId).toMatch(/^cmp_[0-9a-f]{32}$/);
-    expect(sessionId).toMatch(/^ses_[0-9a-f]{32}$/);
-    expect(new Set([userId, companyId, sessionId]).size).toBe(3);
+    expect(new Set([userId, companyId]).size).toBe(2);
   });
 
   it("formats timestamps as ISO strings and adds days deterministically", () => {
@@ -185,37 +182,15 @@ describe("database helper utilities", () => {
     expect(addDaysIso(30, base)).toBe("2026-07-11T00:00:00.000Z");
   });
 
-  it("stores session token hash without raw tokens or provider tokens", async () => {
+  it("does not create a local sessions table", async () => {
     const { db, dispose } = await createD1Harness();
 
     try {
-      await insertUser(db, "usr_session");
-
-      const session = await createSession(
-        db,
-        {
-          userId: "usr_session",
-          tokenHash: "hashed-local-token",
-          expiresAt: "2026-07-11T00:00:00.000Z"
-        },
-        {
-          id: "ses_created",
-          timestamp
-        }
-      );
       const columns = await db
         .prepare("PRAGMA table_info(sessions)")
         .all<{ name: string }>();
-      const columnNames = columns.results.map((column) => column.name);
 
-      expect(session).toMatchObject({
-        id: "ses_created",
-        token_hash: "hashed-local-token"
-      });
-      expect(JSON.stringify(session)).not.toContain("raw-local-token");
-      expect(JSON.stringify(session)).not.toContain("id_token");
-      expect(JSON.stringify(session)).not.toContain("access_token");
-      expect(JSON.stringify(session)).not.toContain("refresh_token");
+      expect(columns.results).toEqual([]);
     } finally {
       await dispose();
     }

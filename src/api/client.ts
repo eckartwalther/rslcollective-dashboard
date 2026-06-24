@@ -9,14 +9,18 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiJson<T>(path: string, init: RequestInit = {}) {
+export async function apiJson<T>(
+  path: string,
+  init: RequestInit = {},
+  authToken?: string | null
+) {
   const response = await apiRequest(path, {
     ...init,
     headers: {
       Accept: "application/json",
       ...init.headers
     }
-  });
+  }, authToken);
 
   const body = await readJsonBody(response);
 
@@ -27,10 +31,17 @@ export async function apiJson<T>(path: string, init: RequestInit = {}) {
   return body as T;
 }
 
-export function apiRequest(path: string, init: RequestInit = {}) {
+export function apiRequest(path: string, init: RequestInit = {}, authToken?: string | null) {
+  const headers = new Headers(init.headers);
+
+  if (authToken) {
+    headers.set("Authorization", `Bearer ${authToken}`);
+  }
+
   return fetch(path, {
     credentials: "include",
-    ...init
+    ...init,
+    headers
   });
 }
 
