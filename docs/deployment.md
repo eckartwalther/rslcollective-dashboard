@@ -25,9 +25,11 @@ CLERK_SECRET_KEY=<Clerk development secret key>
 CLERK_AUTHORIZED_PARTIES=http://localhost:8787,http://127.0.0.1:8787
 DASHBOARD_BASE_URL=http://localhost:8787
 ENVIRONMENT=development
+ADMIN_EMAILS="eckart@rslcollective.org"
 ```
 
 Do not put `CLERK_SECRET_KEY` or future `CLERK_JWT_KEY` values in Vite `VITE_` variables.
+Do not put the admin allowlist in Vite variables; the frontend only receives the current user's `isAdmin` result from `/api/session`.
 
 ## Production Worker Configuration
 
@@ -36,12 +38,15 @@ Do not put `CLERK_SECRET_KEY` or future `CLERK_JWT_KEY` values in Vite `VITE_` v
 ```json
 {
   "vars": {
+    "ADMIN_EMAILS": "eckart@rslcollective.org",
     "CLERK_AUTHORIZED_PARTIES": "https://dashboard.rslcollective.org",
     "DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
     "ENVIRONMENT": "production"
   }
 }
 ```
+
+`ADMIN_EMAILS` is a comma-separated allowlist for server-side admin authorization. The initial production allowlist is `eckart@rslcollective.org`.
 
 Set production secrets with Wrangler:
 
@@ -122,6 +127,8 @@ pnpm db:migrate:local
 pnpm worker:dev
 ```
 
+`pnpm worker:dev` rebuilds `dist/` with Vite `--mode development` before starting Wrangler, so local Worker testing uses `.env.local` and avoids `.env.production.local`.
+
 Then verify:
 
 - `http://localhost:8787/login` renders Clerk sign-in.
@@ -129,6 +136,8 @@ Then verify:
 - Signing in lands on `/dashboard`.
 - `/api/session` returns `{ "authenticated": true, "user": ... }` after sign-in.
 - `/api/company` returns `401` without a valid Clerk token.
+- `/api/admin/users` returns `401` without a valid Clerk token.
+- `/api/admin/users` returns `403` for authenticated non-admin users.
 - Creating a publisher profile returns `201`.
 - Sign-out returns to `/login`.
 
@@ -155,3 +164,5 @@ Production smoke test:
 8. Test Google sign-in.
 9. Test Microsoft sign-in.
 10. Confirm unauthenticated API requests return `401`.
+11. Confirm the Admin navigation item appears only for `ADMIN_EMAILS` users.
+12. Confirm direct non-admin access to `/admin/users` shows an unauthorized state and `/api/admin/users` returns `403`.

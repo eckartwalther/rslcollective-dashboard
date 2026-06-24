@@ -51,8 +51,8 @@ export function conflict(c: Context, message: string) {
   return errorResponse(c, 409, "conflict", message);
 }
 
-export function notFound(c: Context) {
-  return errorResponse(c, 404, "not_found", "Route not found.");
+export function notFound(c: Context, message = "Route not found.") {
+  return errorResponse(c, 404, "not_found", message);
 }
 
 export function serverError(c: Context, message = "An unexpected error occurred.") {

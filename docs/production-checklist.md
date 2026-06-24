@@ -25,6 +25,7 @@ Do not run remote migrations or deploy until each configuration item below is co
 - `wrangler.production.jsonc` has the production D1 database ID.
 - `wrangler.production.jsonc` keeps the `dashboard.rslcollective.org` custom-domain route.
 - `wrangler.production.jsonc` includes:
+  - `ADMIN_EMAILS=eckart@rslcollective.org`
   - `CLERK_AUTHORIZED_PARTIES=https://dashboard.rslcollective.org`
   - `DASHBOARD_BASE_URL=https://dashboard.rslcollective.org`
   - `ENVIRONMENT=production`
@@ -86,3 +87,6 @@ pnpm worker:deploy
 13. Test Microsoft sign-in.
 14. Confirm a direct unauthenticated API request returns `401`.
 15. Confirm `/auth/callback` is not part of the auth flow and returns `404`.
+16. Confirm `/api/admin/users` returns `403` for an authenticated non-admin user.
+17. Confirm `/admin/users` shows the Admin users list for `eckart@rslcollective.org`.
+18. Confirm `/admin/users` does not render user data for an authenticated non-admin user.

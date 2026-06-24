@@ -24,6 +24,7 @@ import {
   Library,
   LogOut,
   Settings,
+  Shield,
   ShieldCheck,
   UserRound
 } from "lucide-react";
@@ -31,6 +32,9 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SessionUser } from "../../api/session";
 import { useCompanyQuery } from "../../api/company";
+import { AdminForbidden } from "../admin/AdminForbidden";
+import { AdminUserDetailPage } from "../admin/AdminUserDetailPage";
+import { AdminUsersPage } from "../admin/AdminUsersPage";
 import { AccountTab } from "../dashboard/AccountTab";
 import { CompanyProfileTab } from "../dashboard/CompanyProfileTab";
 import { DashboardHome } from "../dashboard/DashboardHome";
@@ -43,10 +47,11 @@ const OnboardingGuide = lazy(() =>
   }))
 );
 
-type DashboardView = "dashboard" | "company" | "account" | "onboarding";
+type DashboardView = "dashboard" | "company" | "account" | "adminUsers" | "adminUserDetail" | "onboarding";
 
 type DashboardShellProps = {
   user: SessionUser;
+  isAdmin: boolean;
   onSignOut: () => void;
 };
 
@@ -72,7 +77,13 @@ const navigationItems: NavigationItem[] = [
   { label: "Settings", icon: Settings, disabled: true, disabledReason: "Available after RSL Collective approval" }
 ];
 
-export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
+const adminNavigationItem: NavigationItem = {
+  label: "Admin",
+  view: "adminUsers",
+  icon: Shield
+};
+
+export function DashboardShell({ user, isAdmin, onSignOut }: DashboardShellProps) {
   const theme = useMantineTheme();
   const [opened, { close, toggle }] = useDisclosure();
   const [activeView, setActiveView] = useState<DashboardView>(() => viewFromPathname());
@@ -90,6 +101,10 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
   }, []);
 
   const activeTitle = useMemo(() => {
+    if (activeView === "adminUsers" || activeView === "adminUserDetail") {
+      return "Admin";
+    }
+
     if (activeView === "company") {
       return "Publisher Profile";
     }
@@ -169,9 +184,13 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
           </Stack>
 
           <Stack className={styles.navigation} data-testid="dashboard-navigation">
-            {navigationItems.map((item) => {
+            {[...navigationItems, ...(isAdmin ? [adminNavigationItem] : [])].map((item) => {
               const Icon = item.icon;
-              const active = Boolean(item.view && item.view === activeView);
+              const active = Boolean(
+                item.view &&
+                  (item.view === activeView ||
+                    (item.view === "adminUsers" && activeView === "adminUserDetail"))
+              );
 
               return (
                 <NavLink
@@ -244,6 +263,30 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
           ) : null}
           {activeView === "company" ? <CompanyProfileTab authenticated /> : null}
           {activeView === "account" ? <AccountTab user={user} onSignOut={onSignOut} /> : null}
+          {activeView === "adminUsers" ? (
+            isAdmin ? (
+              <AdminUsersPage
+                enabled={isAdmin}
+                onSelectUser={(userId) => {
+                  navigateToPath(`/admin/users/${userId}`, "adminUserDetail");
+                  close();
+                }}
+              />
+            ) : (
+              <AdminForbidden onBackToDashboard={() => navigateToView("dashboard")} />
+            )
+          ) : null}
+          {activeView === "adminUserDetail" ? (
+            isAdmin ? (
+              <AdminUserDetailPage
+                enabled={isAdmin}
+                userId={adminUserIdFromPathname()}
+                onBack={() => navigateToPath("/admin/users", "adminUsers")}
+              />
+            ) : (
+              <AdminForbidden onBackToDashboard={() => navigateToView("dashboard")} />
+            )
+          ) : null}
           <footer className={styles.footer}>
             <Text component="span" className={styles.footerCopyright}>
               Copyright © 2026 RSL Internet Collective
@@ -263,16 +306,27 @@ export function DashboardShell({ user, onSignOut }: DashboardShellProps) {
   );
 
   function navigateToView(view: DashboardView) {
+    navigateToPath(pathForView(view), view);
+  }
+
+  function navigateToPath(path: string, view: DashboardView) {
     setActiveView(view);
 
-    const nextPath = pathForView(view);
-    if (window.location.pathname !== nextPath) {
-      window.history.pushState(null, "", nextPath);
+    if (window.location.pathname !== path || window.location.search) {
+      window.history.pushState(null, "", path);
     }
   }
 }
 
 function viewFromPathname(): DashboardView {
+  if (window.location.pathname.startsWith("/admin/users/")) {
+    return "adminUserDetail";
+  }
+
+  if (window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/users")) {
+    return "adminUsers";
+  }
+
   if (window.location.pathname.endsWith("/onboarding")) {
     return "onboarding";
   }
@@ -297,9 +351,29 @@ function pathForView(view: DashboardView) {
     return "/dashboard/account";
   }
 
+  if (view === "adminUsers") {
+    return "/admin/users";
+  }
+
+  if (view === "adminUserDetail") {
+    return window.location.pathname.startsWith("/admin/users/")
+      ? window.location.pathname
+      : "/admin/users";
+  }
+
   if (view === "onboarding") {
     return "/dashboard/onboarding";
   }
 
   return "/dashboard";
+}
+
+function adminUserIdFromPathname() {
+  const prefix = "/admin/users/";
+
+  if (!window.location.pathname.startsWith(prefix)) {
+    return null;
+  }
+
+  return decodeURIComponent(window.location.pathname.slice(prefix.length));
 }

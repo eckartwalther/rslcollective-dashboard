@@ -16,6 +16,7 @@ export type SessionResponse =
   | { authenticated: false }
   | {
       authenticated: true;
+      isAdmin: boolean;
       user: SessionUser;
     };
 

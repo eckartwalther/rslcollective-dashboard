@@ -5,6 +5,7 @@
 	"account_id": "a1c2ba23b7e8773d87661d35ddca3fe7",
 	"compatibility_date": "2026-06-11",
 	"vars": {
+		"ADMIN_EMAILS": "eckart@rslcollective.org",
 		"CLERK_AUTHORIZED_PARTIES": "https://dashboard.rslcollective.org",
 		"DASHBOARD_BASE_URL": "https://dashboard.rslcollective.org",
 		"ENVIRONMENT": "production"

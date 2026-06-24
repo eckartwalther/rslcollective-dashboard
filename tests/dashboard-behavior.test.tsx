@@ -35,10 +35,26 @@ const gettingStartedSteps = [
 function authenticatedSession(overrides: Partial<AuthenticatedSession["user"]> = {}): SessionResponse {
   return {
     authenticated: true,
+    isAdmin: false,
     user: {
       email: "jane@example.com",
       firstName: "Jane",
       lastName: "Publisher",
+      role: "owner",
+      hasCompany: true,
+      ...overrides
+    }
+  };
+}
+
+function adminSession(overrides: Partial<AuthenticatedSession["user"]> = {}): SessionResponse {
+  return {
+    authenticated: true,
+    isAdmin: true,
+    user: {
+      email: "eckart@rslcollective.org",
+      firstName: "Eckart",
+      lastName: "Admin",
       role: "owner",
       hasCompany: true,
       ...overrides
@@ -53,7 +69,26 @@ function jsonResponse(body: unknown) {
   });
 }
 
-function mockDashboardFetch(session: SessionResponse, companyBody: unknown = { company }) {
+function errorJsonResponse(status: number, message: string) {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code: status === 403 ? "forbidden" : "server_error",
+        message
+      }
+    }),
+    {
+      status,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+}
+
+function mockDashboardFetch(
+  session: SessionResponse,
+  companyBody: unknown = { company },
+  extraResponses: Record<string, Response | Promise<Response>> = {}
+) {
   const fetchMock = vi.fn((path: string) => {
     if (path === "/api/session") {
       return Promise.resolve(jsonResponse(session));
@@ -61,6 +96,10 @@ function mockDashboardFetch(session: SessionResponse, companyBody: unknown = { c
 
     if (path === "/api/company") {
       return Promise.resolve(jsonResponse(companyBody));
+    }
+
+    if (path in extraResponses) {
+      return Promise.resolve(extraResponses[path]);
     }
 
     return Promise.reject(new Error(`Unexpected request: ${path}`));
@@ -161,6 +200,7 @@ describe("dashboard behavior", () => {
   it("does not render provider IDs, session IDs, or token hashes", async () => {
     mockDashboardFetch({
       authenticated: true,
+      isAdmin: false,
       user: {
         email: "jane@example.com",
         firstName: "Jane",
@@ -344,6 +384,7 @@ describe("dashboard behavior", () => {
       "",
       "Onboarding Guide"
     ]);
+    expect(screen.queryByRole("button", { name: /^Admin/i })).not.toBeInTheDocument();
     expect(onboardingLink).toHaveAttribute("data-testid", "dashboard-help-navigation");
     expect(onboardingLink).toHaveAttribute("href", "/dashboard/onboarding");
     expect(onboardingLink).not.toHaveAttribute("target");
@@ -361,6 +402,24 @@ describe("dashboard behavior", () => {
       divider.compareDocumentPosition(onboardingLink) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(screen.queryByText("Requires approval")).not.toBeInTheDocument();
+  });
+
+  it("shows the Admin nav link after Settings for admin users", async () => {
+    mockDashboardFetch(adminSession());
+
+    renderDashboard();
+
+    const adminButton = await screen.findByRole("button", { name: /^Admin/i });
+    const settingsButton = screen.getByRole("button", { name: /^Settings/i });
+    const divider = screen.getByTestId("onboarding-guide-divider");
+
+    expect(adminButton).toBeInTheDocument();
+    expect(
+      settingsButton.compareDocumentPosition(adminButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      adminButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it("lets a user navigate from Dashboard to Publisher Profile and Account Information", async () => {
@@ -577,5 +636,196 @@ describe("dashboard behavior", () => {
         /This guide helps publishers prepare their content for licensing through the RSL Collective/
       )
     ).toBeInTheDocument();
+  });
+
+  it("renders the admin users list and opens user detail", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    mockDashboardFetch(adminSession(), { company }, {
+      "/api/admin/users?page=1&pageSize=25": jsonResponse({
+        users: [
+          {
+            id: "usr_newest",
+            email: "newest@example.com",
+            firstName: "Newest",
+            lastName: "User",
+            authProvider: "clerk",
+            createdAt: "2026-06-12T00:00:00.000Z",
+            updatedAt: "2026-06-12T00:00:00.000Z",
+            companyId: "cmp_newest",
+            companyLegalName: "Newest Media LLC"
+          }
+        ],
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1
+      }),
+      "/api/admin/users/usr_newest": jsonResponse({
+        user: {
+          id: "usr_newest",
+          email: "newest@example.com",
+          firstName: "Newest",
+          lastName: "User",
+          authProvider: "clerk",
+          emailVerified: true,
+          role: "owner",
+          createdAt: "2026-06-12T00:00:00.000Z",
+          updatedAt: "2026-06-12T00:00:00.000Z",
+          companyId: "cmp_newest",
+          companyLegalName: "Newest Media LLC",
+          company: {
+            id: "cmp_newest",
+            legalName: "Newest Media LLC",
+            displayName: "Newest Media",
+            companyType: "Publisher",
+            primaryContactName: "Newest User",
+            primaryContactEmail: "newest@example.com",
+            billingContactEmail: null,
+            country: "US",
+            region: "CA",
+            city: "Los Angeles",
+            postalCode: "90001",
+            addressLine1: "1 Test Way",
+            addressLine2: null,
+            description: null,
+            status: "draft",
+            createdAt: "2026-06-12T00:00:00.000Z",
+            updatedAt: "2026-06-12T00:00:00.000Z"
+          }
+        }
+      })
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByRole("heading", { name: "Admin users" })).toBeInTheDocument();
+    expect(screen.getByText("newest@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Newest Media LLC")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "Open Newest User" }));
+
+    expect(window.location.pathname).toBe("/admin/users/usr_newest");
+    expect(await screen.findByRole("heading", { name: "Newest User" })).toBeInTheDocument();
+    expect(screen.getByText("Local user ID")).toBeInTheDocument();
+    expect(screen.getByText("cmp_newest")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("admin-token");
+
+    fireEvent.click(screen.getByRole("button", { name: /Back to users list/i }));
+
+    expect(window.location.pathname).toBe("/admin/users");
+  });
+
+  it("renders admin pagination controls", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    const fetchMock = mockDashboardFetch(adminSession(), { company }, {
+      "/api/admin/users?page=1&pageSize=25": jsonResponse({
+        users: [
+          {
+            id: "usr_newest",
+            email: "newest@example.com",
+            firstName: "Newest",
+            lastName: "User",
+            authProvider: "clerk",
+            createdAt: "2026-06-12T00:00:00.000Z",
+            updatedAt: "2026-06-12T00:00:00.000Z",
+            companyId: null,
+            companyLegalName: null
+          }
+        ],
+        page: 1,
+        pageSize: 25,
+        total: 26,
+        totalPages: 2
+      }),
+      "/api/admin/users?page=2&pageSize=25": jsonResponse({
+        users: [],
+        page: 2,
+        pageSize: 25,
+        total: 26,
+        totalPages: 2
+      })
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("26 total")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/admin/users");
+      expect(window.location.search).toBe("?page=2");
+    });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/admin/users?page=2&pageSize=25", expect.anything());
+    });
+  });
+
+  it("renders an empty admin users state", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    mockDashboardFetch(adminSession(), { company }, {
+      "/api/admin/users?page=1&pageSize=25": jsonResponse({
+        users: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+        totalPages: 0
+      })
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("No registered users")).toBeInTheDocument();
+  });
+
+  it("renders an admin users error state", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    mockDashboardFetch(adminSession(), { company }, {
+      "/api/admin/users?page=1&pageSize=25": errorJsonResponse(500, "Admin users failed.")
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Users could not be loaded")).toBeInTheDocument();
+  });
+
+  it("renders an admin users loading state", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    let resolveUsers: (response: Response) => void = () => undefined;
+    const usersPromise = new Promise<Response>((resolve) => {
+      resolveUsers = resolve;
+    });
+    mockDashboardFetch(adminSession(), { company }, {
+      "/api/admin/users?page=1&pageSize=25": usersPromise
+    });
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".mantine-Skeleton-root").length).toBeGreaterThan(0);
+    });
+
+    resolveUsers(
+      jsonResponse({
+        users: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+        totalPages: 0
+      })
+    );
+  });
+
+  it("does not fetch or render admin data for direct non-admin access", async () => {
+    window.history.pushState(null, "", "/admin/users");
+    const fetchMock = mockDashboardFetch(authenticatedSession(), { company });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Admin access required")).toBeInTheDocument();
+    expect(screen.queryByText("Newest Media LLC")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/admin/),
+      expect.anything()
+    );
   });
 });

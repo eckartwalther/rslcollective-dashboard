@@ -35,6 +35,38 @@ export type CompanyRow = {
   updated_at: string;
 };
 
+export type AdminUserListRow = {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  auth_provider: string;
+  created_at: string;
+  updated_at: string;
+  company_id: string | null;
+  company_legal_name: string | null;
+};
+
+export type AdminUserDetailRow = AdminUserListRow & {
+  email_verified: number;
+  role: string;
+  company_display_name: string | null;
+  company_type: string | null;
+  company_primary_contact_name: string | null;
+  company_primary_contact_email: string | null;
+  company_billing_contact_email: string | null;
+  company_country: string | null;
+  company_region: string | null;
+  company_city: string | null;
+  company_postal_code: string | null;
+  company_address_line1: string | null;
+  company_address_line2: string | null;
+  company_description: string | null;
+  company_status: string | null;
+  company_created_at: string | null;
+  company_updated_at: string | null;
+};
+
 export type AuthenticatedUserData = {
   authProvider: string;
   authSubject: string;
@@ -133,6 +165,72 @@ export async function createUserFromAuthIdentity(
 
 export function getUserById(db: D1Database, userId: string) {
   return db.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first<UserRow>();
+}
+
+export function listUsersForAdmin(db: D1Database, limit: number, offset: number) {
+  return db
+    .prepare(
+      `SELECT
+        users.id,
+        users.email,
+        users.first_name,
+        users.last_name,
+        users.auth_provider,
+        users.created_at,
+        users.updated_at,
+        users.company_id,
+        companies.legal_name AS company_legal_name
+      FROM users
+      LEFT JOIN companies ON companies.id = users.company_id
+      ORDER BY users.created_at DESC, users.id DESC
+      LIMIT ? OFFSET ?`
+    )
+    .bind(limit, offset)
+    .all<AdminUserListRow>();
+}
+
+export async function countUsers(db: D1Database) {
+  const row = await db.prepare("SELECT COUNT(*) AS total FROM users").first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
+export function getUserDetailForAdmin(db: D1Database, userId: string) {
+  return db
+    .prepare(
+      `SELECT
+        users.id,
+        users.email,
+        users.first_name,
+        users.last_name,
+        users.auth_provider,
+        users.email_verified,
+        users.role,
+        users.created_at,
+        users.updated_at,
+        users.company_id,
+        companies.legal_name AS company_legal_name,
+        companies.display_name AS company_display_name,
+        companies.company_type AS company_type,
+        companies.primary_contact_name AS company_primary_contact_name,
+        companies.primary_contact_email AS company_primary_contact_email,
+        companies.billing_contact_email AS company_billing_contact_email,
+        companies.country AS company_country,
+        companies.region AS company_region,
+        companies.city AS company_city,
+        companies.postal_code AS company_postal_code,
+        companies.address_line1 AS company_address_line1,
+        companies.address_line2 AS company_address_line2,
+        companies.description AS company_description,
+        companies.status AS company_status,
+        companies.created_at AS company_created_at,
+        companies.updated_at AS company_updated_at
+      FROM users
+      LEFT JOIN companies ON companies.id = users.company_id
+      WHERE users.id = ?`
+    )
+    .bind(userId)
+    .first<AdminUserDetailRow>();
 }
 
 export async function getCompanyForUser(db: D1Database, userId: string) {

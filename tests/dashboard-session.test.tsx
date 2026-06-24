@@ -18,6 +18,7 @@ function jsonResponse(body: unknown) {
 function authenticatedSession(overrides: Partial<AuthenticatedSession["user"]> = {}): SessionResponse {
   return {
     authenticated: true,
+    isAdmin: false,
     user: {
       email: "jane@example.com",
       firstName: "Jane",

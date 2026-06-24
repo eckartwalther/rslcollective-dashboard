@@ -3,6 +3,7 @@ import type { ClerkAuthDeps, ClerkBackendUser } from "../worker/lib/clerk";
 import type { AuthenticatedUserData, UserRow } from "../worker/lib/db";
 
 const env = {
+  ADMIN_EMAILS: "eckart@rslcollective.org",
   CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
   CLERK_SECRET_KEY: "sk_test_mock",
   ENVIRONMENT: "production",
@@ -90,6 +91,7 @@ describe("GET /api/session", () => {
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({
       authenticated: true,
+      isAdmin: false,
       user: {
         email: "jane@example.com",
         firstName: "Jane",
@@ -118,6 +120,7 @@ describe("GET /api/session", () => {
     expect(response.status).toBe(200);
     expect(await readJson(response)).toEqual({
       authenticated: true,
+      isAdmin: false,
       user: {
         email: "jane@example.com",
         firstName: "Jane",
@@ -143,6 +146,25 @@ describe("GET /api/session", () => {
     expect(body).not.toContain("auth_subject");
     expect(body).not.toContain("auth_provider");
     expect(body).not.toContain("safe-response-token");
+  });
+
+  it("returns isAdmin only for configured admin emails", async () => {
+    const { route } = createHarness({
+      user: createUser({
+        email: "eckart@rslcollective.org"
+      })
+    });
+    const response = await route.request(
+      "/",
+      { headers: { Authorization: "Bearer clerk-session-token" } },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toMatchObject({
+      authenticated: true,
+      isAdmin: true
+    });
   });
 
   it("returns unauthenticated when Clerk token verification fails", async () => {

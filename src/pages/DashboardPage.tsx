@@ -23,6 +23,7 @@ export function DashboardPage() {
   return (
     <DashboardShell
       user={sessionQuery.data.user}
+      isAdmin={sessionQuery.data.isAdmin}
       onSignOut={() => {
         void signOut({ redirectUrl: "/login" });
       }}

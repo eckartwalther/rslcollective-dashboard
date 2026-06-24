@@ -1,6 +1,7 @@
 import app from "../worker/index";
 
 const env = {
+  ADMIN_EMAILS: "eckart@rslcollective.org",
   CLERK_AUTHORIZED_PARTIES: "https://dashboard.rslcollective.org",
   CLERK_SECRET_KEY: "sk_test_mock",
   DASHBOARD_BASE_URL: "https://dashboard.rslcollective.org",
@@ -33,7 +34,31 @@ describe("Worker routing", () => {
     });
   });
 
-  it.each(["/login", "/login/sso-callback", "/register", "/register/verify", "/logout"])(
+  it("keeps unknown API routes as JSON 404 responses", async () => {
+    const response = await app.fetch(
+      new Request("https://dashboard.rslcollective.org/api/does-not-exist"),
+      env
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Content-Type")).toContain("application/json");
+    expect(await response.json()).toEqual({
+      error: {
+        code: "not_found",
+        message: "Route not found."
+      }
+    });
+  });
+
+  it.each([
+    "/login",
+    "/login/sso-callback",
+    "/register",
+    "/register/verify",
+    "/logout",
+    "/admin/users",
+    "/admin/users/usr_test"
+  ])(
     "serves the SPA for Clerk route %s",
     async (path) => {
       const response = await app.fetch(

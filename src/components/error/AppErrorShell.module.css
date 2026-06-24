@@ -1,0 +1,44 @@
+.card {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  box-shadow: 0 22px 60px rgba(17, 24, 39, 0.14);
+  max-width: 440px;
+  width: min(100%, 440px);
+}
+
+.eyebrow {
+  color: var(--mantine-color-rslBlue-8);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.title {
+  color: #111827;
+}
+
+.description {
+  color: #5f6b7a;
+  line-height: 1.55;
+}
+
+.actions {
+  width: 100%;
+}
+
+@media (max-width: 420px) {
+  .card {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    box-shadow: none;
+    max-width: none;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

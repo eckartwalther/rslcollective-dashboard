@@ -5,10 +5,13 @@ import { Miniflare } from "miniflare";
 
 import coreMigration from "../migrations/0001_core.sql?raw";
 import {
+  countUsers,
   createUserFromAuthIdentity,
   createCompanyAndAttachUser,
+  getUserDetailForAdmin,
   getCompanyForUser,
   getUserById,
+  listUsersForAdmin,
   type AuthenticatedUserData,
   type CompanyData,
   type CompanyRow
@@ -113,7 +116,12 @@ async function insertCompany(db: D1Database, id: string) {
     .run();
 }
 
-async function insertUser(db: D1Database, id: string, companyId: string | null = null) {
+async function insertUser(
+  db: D1Database,
+  id: string,
+  companyId: string | null = null,
+  createdAt = timestamp
+) {
   await db
     .prepare(
       `INSERT INTO users (
@@ -137,8 +145,8 @@ async function insertUser(db: D1Database, id: string, companyId: string | null =
       `${id}@example.com`,
       "Test",
       "User",
-      timestamp,
-      timestamp
+      createdAt,
+      createdAt
     )
     .run();
 }
@@ -228,6 +236,54 @@ describe("createUserFromAuthIdentity D1 idempotency", () => {
       expect(second?.auth_subject).toBe("user_clerk_parallel");
       expect(first?.id).toBe(second?.id);
       expect(row?.count).toBe(1);
+    } finally {
+      await dispose();
+    }
+  });
+});
+
+describe("admin user D1 helpers", () => {
+  it("counts and lists users newest first with company legal names", async () => {
+    const { db, dispose } = await createD1Harness();
+
+    try {
+      await insertCompany(db, "cmp_existing");
+      await insertUser(db, "usr_oldest", null, "2026-06-10T00:00:00.000Z");
+      await insertUser(db, "usr_newest", "cmp_existing", "2026-06-12T00:00:00.000Z");
+      await insertUser(db, "usr_middle", null, "2026-06-11T00:00:00.000Z");
+
+      const total = await countUsers(db);
+      const firstPage = await listUsersForAdmin(db, 2, 0);
+
+      expect(total).toBe(3);
+      expect(firstPage.results.map((user) => user.id)).toEqual(["usr_newest", "usr_middle"]);
+      expect(firstPage.results[0]).toMatchObject({
+        company_id: "cmp_existing",
+        company_legal_name: "Existing Publishing LLC"
+      });
+    } finally {
+      await dispose();
+    }
+  });
+
+  it("fetches admin user detail with a joined company summary", async () => {
+    const { db, dispose } = await createD1Harness();
+
+    try {
+      await insertCompany(db, "cmp_existing");
+      await insertUser(db, "usr_detail", "cmp_existing");
+
+      const detail = await getUserDetailForAdmin(db, "usr_detail");
+
+      expect(detail).toMatchObject({
+        id: "usr_detail",
+        auth_provider: "clerk",
+        email: "usr_detail@example.com",
+        company_id: "cmp_existing",
+        company_legal_name: "Existing Publishing LLC",
+        company_status: "draft"
+      });
+      expect(detail).not.toHaveProperty("authSubject");
     } finally {
       await dispose();
     }

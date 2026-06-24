@@ -317,6 +317,7 @@ describe("CompanyProfileForm", () => {
         return Promise.resolve(
           jsonResponse({
             authenticated: true,
+            isAdmin: false,
             user: {
               email: "jane@example.com",
               firstName: "Jane",

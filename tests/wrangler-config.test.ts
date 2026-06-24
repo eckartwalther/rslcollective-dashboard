@@ -8,7 +8,10 @@ describe("Wrangler config routing", () => {
     expect(localWranglerConfig).not.toMatch(/"routes"\s*:/);
     expect(localWranglerConfig).not.toMatch(/"route"\s*:/);
     expect(localWranglerConfig).not.toMatch(/"custom_domain"\s*:\s*true/);
-    expect(packageJson.scripts["worker:dev"]).toBe("wrangler dev --config wrangler.jsonc");
+    expect(packageJson.scripts["worker:dev"]).toBe(
+      "vite build --mode development && wrangler dev --config wrangler.jsonc"
+    );
+    expect(packageJson.scripts["worker:dev"]).toContain("--mode development");
   });
 
   it("keeps the production dashboard host in the explicit production config", () => {

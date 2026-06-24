@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import {
-  type UserRow
-} from "../lib/db";
+import { isAdminUser, type AdminEnv } from "../lib/admin";
+import { type UserRow } from "../lib/db";
 import {
   authenticateClerkRequest,
   defaultClerkAuthDeps,
@@ -9,9 +8,10 @@ import {
   type ClerkEnv
 } from "../lib/clerk";
 
-type Bindings = ClerkEnv & {
-  DB: D1Database;
-};
+type Bindings = ClerkEnv &
+  AdminEnv & {
+    DB: D1Database;
+  };
 
 export type SessionRouteDeps = {
   clerkAuth: ClerkAuthDeps;
@@ -38,6 +38,7 @@ export function createSessionRoutes(deps: SessionRouteDeps = defaultDeps) {
 
     return c.json({
       authenticated: true,
+      isAdmin: isAdminUser(result.user, c.env),
       user: mapSessionUser(result.user)
     });
   });

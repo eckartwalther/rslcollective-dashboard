@@ -8,22 +8,38 @@ import { setClerkAuthState } from "./setup";
 describe("Clerk auth pages", () => {
   it("renders the simplified branded login page around Clerk SignIn", () => {
     setClerkAuthState({ isSignedIn: false });
+    const fetchMock = vi.fn(() => Promise.reject(new Error("auth pages must not fetch APIs")));
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<LoginPage />);
 
     expect(screen.getAllByAltText("RSL Internet Collective")).toHaveLength(1);
     expect(screen.queryByText(/dashboard access/i)).not.toBeInTheDocument();
     expect(screen.getByTestId("clerk-sign-in")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("renders the simplified branded register page around Clerk SignUp", () => {
     setClerkAuthState({ isSignedIn: false });
+    const fetchMock = vi.fn(() => Promise.reject(new Error("auth pages must not fetch APIs")));
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<RegisterPage />);
 
     expect(screen.getAllByAltText("RSL Internet Collective")).toHaveLength(1);
     expect(screen.queryByText(/dashboard access/i)).not.toBeInTheDocument();
     expect(screen.getByTestId("clerk-sign-up")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let admin/session loading block signed-out auth pages", () => {
+    setClerkAuthState({ isLoaded: true, isSignedIn: false });
+    const fetchMock = vi.fn(() => Promise.reject(new Error("signed-out auth pages must not call APIs")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LoginPage />);
+    expect(screen.getByTestId("clerk-sign-in")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does not render the old split-panel marketing copy", () => {
