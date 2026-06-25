@@ -394,3 +394,50 @@ export async function updateCompanyForUser(
 
   return getCompanyForUser(db, userId);
 }
+
+export type DeleteLocalAccountDataResult = {
+  userDeleted: boolean;
+  sessionRowsDeleted: number;
+};
+
+export async function deleteLocalAccountData(
+  db: D1Database,
+  userId: string
+): Promise<DeleteLocalAccountDataResult> {
+  const statements: D1PreparedStatement[] = [];
+  const sessionsUserIdColumn = await getSessionsUserIdColumn(db);
+
+  if (sessionsUserIdColumn) {
+    statements.push(
+      db.prepare(`DELETE FROM sessions WHERE ${sessionsUserIdColumn} = ?`).bind(userId)
+    );
+  }
+
+  statements.push(db.prepare("DELETE FROM users WHERE id = ?").bind(userId));
+
+  const results = await db.batch(statements);
+  const userResult = results.at(-1);
+  const sessionsResult = sessionsUserIdColumn ? results[0] : null;
+
+  return {
+    userDeleted: (userResult?.meta.changes ?? 0) === 1,
+    sessionRowsDeleted: sessionsResult?.meta.changes ?? 0
+  };
+}
+
+async function getSessionsUserIdColumn(db: D1Database) {
+  const columns = await db
+    .prepare("PRAGMA table_info(sessions)")
+    .all<{ name: string }>();
+  const columnNames = new Set(columns.results.map((column) => column.name));
+
+  if (columnNames.has("user_id")) {
+    return "user_id";
+  }
+
+  if (columnNames.has("userId")) {
+    return "userId";
+  }
+
+  return null;
+}

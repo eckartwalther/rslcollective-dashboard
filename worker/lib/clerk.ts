@@ -71,6 +71,15 @@ export const defaultClerkAuthDeps: ClerkAuthDeps = {
   createUserFromAuthIdentity
 };
 
+export async function deleteClerkUser(env: ClerkEnv, userId: string) {
+  if (!env.CLERK_SECRET_KEY) {
+    throw new Error("Clerk is not configured.");
+  }
+
+  const client = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+  await client.users.deleteUser(userId);
+}
+
 export async function authenticateClerkRequest(
   db: D1Database,
   request: Request,

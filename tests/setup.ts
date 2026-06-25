@@ -2,8 +2,8 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import type { ReactNode } from "react";
 
-const clerkSignOutMock = vi.fn(() => Promise.resolve());
-const clerkGetTokenMock = vi.fn(() => Promise.resolve("test-clerk-token"));
+export const clerkSignOutMock = vi.fn(() => Promise.resolve());
+export const clerkGetTokenMock = vi.fn(() => Promise.resolve("test-clerk-token"));
 const clerkAuthState = {
   isLoaded: true,
   isSignedIn: true

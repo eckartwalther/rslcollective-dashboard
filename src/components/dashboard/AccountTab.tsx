@@ -1,6 +1,8 @@
-import { Alert, Button, Card, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { useAuth } from "@clerk/react";
+import { Alert, Button, Card, Group, Modal, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import { LogOut, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useDeleteAccountMutation } from "../../api/account";
 import type { SessionUser } from "../../api/session";
 import { PageHeader } from "../layout/PageHeader";
 
@@ -14,14 +16,23 @@ const accountCopy = {
   dangerDescription:
     "Deleting your account is permanent and cannot be undone.",
   deleteButton: "Delete account",
-  deleteRequestTitle: "Account deletion request",
-  deleteRequestDescription:
-    "Account deletion is handled by RSL Collective support for now. No account, session, or publisher profile records were deleted from this dashboard."
+  modalTitle: "Delete account?",
+  modalDescription:
+    "Deleting your account will permanently delete your RSL Collective account and sign you out. This action cannot be undone.",
+  cancelButton: "Cancel",
+  confirmButton: "Delete my account",
+  errorTitle: "Account could not be deleted",
+  errorDescription:
+    "We could not delete your account. Please try again or contact RSL Collective support."
 };
 
+const deletedAccountRedirectPath = "/login?deleted=1";
+
 export function AccountTab({ user, onSignOut }: AccountTabProps) {
+  const { signOut } = useAuth();
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
-  const [deleteRequestVisible, setDeleteRequestVisible] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const deleteAccountMutation = useDeleteAccountMutation();
 
   return (
     <Stack gap="lg">
@@ -63,23 +74,75 @@ export function AccountTab({ user, onSignOut }: AccountTabProps) {
           <Text size="sm" c="dimmed">
             {accountCopy.dangerDescription}
           </Text>
-          {deleteRequestVisible ? (
-            <Alert color="red" variant="light" title={accountCopy.deleteRequestTitle}>
-              {accountCopy.deleteRequestDescription}
-            </Alert>
-          ) : null}
           <Button
             color="red"
             variant="light"
             leftSection={<Trash2 size={16} />}
-            onClick={() => setDeleteRequestVisible(true)}
+            onClick={() => {
+              deleteAccountMutation.reset();
+              setDeleteModalOpen(true);
+            }}
           >
             {accountCopy.deleteButton}
           </Button>
         </Stack>
       </Card>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => {
+          if (!deleteAccountMutation.isPending) {
+            setDeleteModalOpen(false);
+          }
+        }}
+        title={accountCopy.modalTitle}
+        centered
+        transitionProps={{ duration: 0 }}
+      >
+        <Stack gap="md">
+          <Text size="sm">{accountCopy.modalDescription}</Text>
+          {deleteAccountMutation.isError ? (
+            <Alert color="red" variant="light" title={accountCopy.errorTitle}>
+              {accountCopy.errorDescription}
+            </Alert>
+          ) : null}
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deleteAccountMutation.isPending}
+            >
+              {accountCopy.cancelButton}
+            </Button>
+            <Button
+              color="red"
+              leftSection={<Trash2 size={16} />}
+              loading={deleteAccountMutation.isPending}
+              onClick={() => {
+                void confirmAccountDeletion();
+              }}
+            >
+              {accountCopy.confirmButton}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
+
+  async function confirmAccountDeletion() {
+    try {
+      await deleteAccountMutation.mutateAsync();
+    } catch {
+      return;
+    }
+
+    try {
+      await signOut({ redirectUrl: deletedAccountRedirectPath });
+    } catch {
+      window.location.assign(deletedAccountRedirectPath);
+    }
+  }
 }
 
 function AccountField({

@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AppProviders } from "../src/app/providers";
 import { AccountTab } from "../src/components/dashboard/AccountTab";
 import type { SessionUser } from "../src/api/session";
+import { clerkSignOutMock } from "./setup";
 
 const userWithCompany: SessionUser = {
   email: "jane@example.com",
@@ -91,15 +92,102 @@ describe("AccountTab", () => {
     expect(screen.getByRole("button", { name: /delete account/i })).toBeInTheDocument();
   });
 
-  it("explains account deletion is a support request and does not call a delete API", () => {
+  it("opens the account deletion confirmation modal", () => {
+    renderAccountTab();
+
+    fireEvent.click(screen.getByRole("button", { name: /^delete account$/i }));
+
+    expect(screen.getByRole("dialog", { name: "Delete account?" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Deleting your account will permanently delete your RSL Collective account and sign you out. This action cannot be undone."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete my account" })).toBeInTheDocument();
+  });
+
+  it("closes the account deletion modal on cancel without calling the delete API", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     renderAccountTab();
 
-    fireEvent.click(screen.getByRole("button", { name: /delete account/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^delete account$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.getByText("Account deletion request")).toBeInTheDocument();
-    expect(screen.getByText(/handled by RSL Collective support/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Delete account?" })).not.toBeInTheDocument();
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("calls DELETE /api/account only after confirmation", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ deleted: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    renderAccountTab();
+
+    fireEvent.click(screen.getByRole("button", { name: /^delete account$/i }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/account",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: expect.any(Headers)
+        })
+      );
+    });
+    const firstCall = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = firstCall[1].headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer test-clerk-token");
+  });
+
+  it("redirects to the signed-out deleted-account state on success", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ deleted: true })));
+    renderAccountTab();
+
+    fireEvent.click(screen.getByRole("button", { name: /^delete account$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+
+    await waitFor(() => {
+      expect(clerkSignOutMock).toHaveBeenCalledWith({ redirectUrl: "/login?deleted=1" });
+    });
+  });
+
+  it("shows a clear error and does not redirect when account deletion fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(
+          {
+            error: {
+              code: "server_error",
+              message: "Your account could not be deleted."
+            }
+          },
+          500
+        )
+      )
+    );
+    renderAccountTab();
+
+    fireEvent.click(screen.getByRole("button", { name: /^delete account$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete my account" }));
+
+    expect(await screen.findByText("Account could not be deleted")).toBeInTheDocument();
+    expect(screen.getByText(/Please try again or contact RSL Collective support/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Delete account?" })).toBeInTheDocument();
+    expect(clerkSignOutMock).not.toHaveBeenCalled();
+  });
 });
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}

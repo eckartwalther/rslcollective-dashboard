@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { serveAssetFallback } from "./lib/assets";
 import { notFound } from "./lib/responses";
+import { accountRoutes } from "./routes/account";
 import { adminRoutes } from "./routes/admin";
 import { companyRoutes } from "./routes/company";
 import { sessionRoutes } from "./routes/session";
@@ -26,6 +27,7 @@ app.get("/logout", serveAssetFallback);
 app.get("/admin/*", serveAssetFallback);
 app.get("/admin", serveAssetFallback);
 app.route("/api/session", sessionRoutes);
+app.route("/api/account", accountRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/company", companyRoutes);
 
