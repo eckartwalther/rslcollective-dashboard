@@ -54,6 +54,17 @@ describe("Clerk auth pages", () => {
     expect(screen.queryByText(/welcome/i)).not.toBeInTheDocument();
   });
 
+  it("links the auth page wordmark to the public RSL Collective homepage", () => {
+    setClerkAuthState({ isSignedIn: false });
+
+    render(<LoginPage />);
+
+    expect(screen.getByRole("link", { name: /go to rsl collective home/i })).toHaveAttribute(
+      "href",
+      "https://rslcollective.org/"
+    );
+  });
+
   it("configures Clerk-owned titles through localization", () => {
     expect(providersSource).toContain("Sign in to your account");
     expect(providersSource).toContain("Create your RSL Collective account");
