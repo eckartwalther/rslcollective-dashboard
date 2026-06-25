@@ -50,6 +50,22 @@ describe("Worker routing", () => {
     });
   });
 
+  it("keeps unknown admin API routes as JSON 404 responses", async () => {
+    const response = await app.fetch(
+      new Request("https://dashboard.rslcollective.org/api/admin/does-not-exist"),
+      env
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Content-Type")).toContain("application/json");
+    expect(await response.json()).toEqual({
+      error: {
+        code: "not_found",
+        message: "Route not found."
+      }
+    });
+  });
+
   it.each([
     "/login",
     "/login/sso-callback",

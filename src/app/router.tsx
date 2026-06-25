@@ -36,7 +36,12 @@ export const appRoutes: RouteObject[] = [
     errorElement: routeErrorElement
   },
   {
-    path: "/admin/*",
+    path: "/admin/users",
+    element: <DashboardPage />,
+    errorElement: routeErrorElement
+  },
+  {
+    path: "/admin/users/:id",
     element: <DashboardPage />,
     errorElement: routeErrorElement
   },

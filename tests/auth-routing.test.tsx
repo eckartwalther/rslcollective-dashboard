@@ -5,6 +5,30 @@ import { appRoutes } from "../src/app/router";
 import { AppErrorPage } from "../src/pages/AppErrorPage";
 import { setClerkAuthState } from "./setup";
 
+const nonAdminSession = {
+  authenticated: true,
+  isAdmin: false,
+  user: {
+    email: "jane@example.com",
+    firstName: "Jane",
+    lastName: "Publisher",
+    role: "owner",
+    hasCompany: true
+  }
+};
+
+const adminSession = {
+  authenticated: true,
+  isAdmin: true,
+  user: {
+    email: "eckart@rslcollective.org",
+    firstName: "Eckart",
+    lastName: "Admin",
+    role: "owner",
+    hasCompany: true
+  }
+};
+
 function renderRoutes(initialPath: string, routes: RouteObject[] = appRoutes) {
   const router = createMemoryRouter(routes, {
     initialEntries: [initialPath]
@@ -23,44 +47,35 @@ function BrokenRoute(): null {
   throw new Error("private route failure");
 }
 
-function mockDashboardFetch() {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((path: string) => {
-      if (path === "/api/session") {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              authenticated: true,
-              isAdmin: false,
-              user: {
-                email: "jane@example.com",
-                firstName: "Jane",
-                lastName: "Publisher",
-                role: "owner",
-                hasCompany: true
-              }
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" }
-            }
-          )
-        );
-      }
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
-      if (path === "/api/company") {
-        return Promise.resolve(
-          new Response(JSON.stringify({ company: null }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          })
-        );
-      }
+function mockDashboardFetch(
+  session: unknown = nonAdminSession,
+  extraResponses: Record<string, Response | Promise<Response>> = {}
+) {
+  const fetchMock = vi.fn((path: string) => {
+    if (path === "/api/session") {
+      return Promise.resolve(jsonResponse(session));
+    }
 
-      return Promise.reject(new Error(`Unexpected request: ${path}`));
-    })
-  );
+    if (path === "/api/company") {
+      return Promise.resolve(jsonResponse({ company: null }));
+    }
+
+    if (path in extraResponses) {
+      return Promise.resolve(extraResponses[path]);
+    }
+
+    return Promise.reject(new Error(`Unexpected request: ${path}`));
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 describe("Clerk auth routing", () => {
@@ -107,6 +122,104 @@ describe("Clerk auth routing", () => {
     expect(router.state.location.pathname).toBe("/admin/users");
     expect(screen.queryByRole("heading", { name: "Page not found" })).not.toBeInTheDocument();
   });
+
+  it("/admin/users renders the admin users page for an admin", async () => {
+    setClerkAuthState({ isSignedIn: true });
+    window.history.pushState(null, "", "/admin/users");
+    mockDashboardFetch(adminSession, {
+      "/api/admin/users?page=1&pageSize=25": jsonResponse({
+        users: [
+          {
+            id: "usr_admin_target",
+            email: "target@example.com",
+            firstName: "Target",
+            lastName: "User",
+            authProvider: "clerk",
+            createdAt: "2026-06-12T00:00:00.000Z",
+            updatedAt: "2026-06-12T00:00:00.000Z",
+            companyId: null,
+            companyLegalName: null
+          }
+        ],
+        page: 1,
+        pageSize: 25,
+        total: 1,
+        totalPages: 1
+      })
+    });
+
+    const router = renderRoutes("/admin/users");
+
+    expect(await screen.findByRole("heading", { name: "Admin users" })).toBeInTheDocument();
+    expect(screen.getByText("target@example.com")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/admin/users");
+  });
+
+  it("/admin/users/:id renders the admin user detail page for an admin", async () => {
+    setClerkAuthState({ isSignedIn: true });
+    window.history.pushState(null, "", "/admin/users/usr_admin_target");
+    mockDashboardFetch(adminSession, {
+      "/api/admin/users/usr_admin_target": jsonResponse({
+        user: {
+          id: "usr_admin_target",
+          email: "target@example.com",
+          firstName: "Target",
+          lastName: "User",
+          authProvider: "clerk",
+          emailVerified: true,
+          role: "owner",
+          createdAt: "2026-06-12T00:00:00.000Z",
+          updatedAt: "2026-06-12T00:00:00.000Z",
+          companyId: null,
+          companyLegalName: null,
+          company: null
+        }
+      })
+    });
+
+    const router = renderRoutes("/admin/users/usr_admin_target");
+
+    expect(await screen.findByRole("heading", { name: "Target User" })).toBeInTheDocument();
+    expect(screen.getByText("target@example.com")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/admin/users/usr_admin_target");
+  });
+
+  it("/admin/users/:id renders a clean not found state when the user does not exist", async () => {
+    setClerkAuthState({ isSignedIn: true });
+    window.history.pushState(null, "", "/admin/users/usr_missing");
+    mockDashboardFetch(adminSession, {
+      "/api/admin/users/usr_missing": jsonResponse(
+        {
+          error: {
+            code: "not_found",
+            message: "User not found."
+          }
+        },
+        404
+      )
+    });
+
+    const router = renderRoutes("/admin/users/usr_missing");
+
+    expect(await screen.findByText("User not found")).toBeInTheDocument();
+    expect(screen.getByText("The requested dashboard user does not exist.")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/admin/users/usr_missing");
+  });
+
+  it.each(["/admin/usersss", "/admin/foo"])(
+    "%s renders the branded not found page without admin API calls",
+    async (path) => {
+      setClerkAuthState({ isSignedIn: true });
+      const fetchMock = vi.fn(() => Promise.reject(new Error("invalid admin routes must not fetch APIs")));
+      vi.stubGlobal("fetch", fetchMock);
+      const router = renderRoutes(path);
+
+      expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+      expect(screen.getByText("The page you requested does not exist or may have moved.")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(path);
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("/nonexistent-route renders the branded not found page", async () => {
     setClerkAuthState({ isSignedIn: false });

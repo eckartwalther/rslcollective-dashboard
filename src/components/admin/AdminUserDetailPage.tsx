@@ -1,6 +1,8 @@
 import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
 import { useAdminUserDetailQuery } from "../../api/admin";
+import { ApiError } from "../../api/client";
+import { EmptyState } from "../layout/EmptyState";
 import { ErrorState } from "../layout/ErrorState";
 import { LoadingState } from "../layout/LoadingState";
 
@@ -16,6 +18,20 @@ export function AdminUserDetailPage({ enabled, userId, onBack }: AdminUserDetail
 
   if (userQuery.isLoading || userQuery.isFetching) {
     return <LoadingState rows={6} />;
+  }
+
+  if (userQuery.error instanceof ApiError && userQuery.error.response.status === 404) {
+    return (
+      <EmptyState
+        title="User not found"
+        description="The requested dashboard user does not exist."
+        action={
+          <Button variant="light" onClick={onBack} leftSection={<ArrowLeft size={16} />}>
+            Back to users list
+          </Button>
+        }
+      />
+    );
   }
 
   if (userQuery.isError || !user) {

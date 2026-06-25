@@ -323,7 +323,7 @@ function viewFromPathname(): DashboardView {
     return "adminUserDetail";
   }
 
-  if (window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/users")) {
+  if (window.location.pathname === "/admin/users") {
     return "adminUsers";
   }
 
